@@ -1,0 +1,71 @@
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'application'
+apply plugin: 'jacoco'
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'org.springframework.boot'
+
+group 'com.endoran.foodplan'
+mainClassName = 'com.endoran.foodplan.Application'
+version '0.1.0'
+
+sourceCompatibility = JavaVersion.VERSION_11
+targetCompatibility = JavaVersion.VERSION_11
+
+buildscript {
+    ext {
+        // single point for defining all the versions of dependencies for all subprojects
+
+        // spring
+        springBootVersion = '2.3.5.RELEASE'
+//        springCloudAwsMessagingVersion = '2.2.5.RELEASE'
+        springDocVersion='1.4.8'
+
+        // AWS
+        awsJavaSdkVersion = '1.11.899'
+
+        // third-party core libs
+        jacksonVersion = '2.11.3'
+
+        // testing
+        junitVersion = '4.12'
+        hamcrestVersion = '2.2'
+        pojotVersion = '1.4'
+        awaitilityVersion = '4.0.3'
+        mockitoVersion = '3.6.0'
+    }
+
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath "org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}"
+    }
+}
+
+dependencies {
+    implementation "io.springfox:springfox-swagger2:3.0.0"
+    implementation "io.springfox:springfox-swagger-ui:3.0.0"
+    implementation "io.springfox:springfox-spring-web:3.0.0"
+    implementation "io.springfox:springfox-oas:3.0.0"
+    implementation "io.swagger:swagger-annotations:1.5.21"
+    implementation "io.swagger:swagger-models:1.5.21"
+
+    implementation "io.springfox:springfox-boot-starter:3.0.0"
+    implementation "org.springframework.boot:spring-boot-starter-web"
+    implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
+    implementation 'org.springframework.boot:spring-boot-starter-data-rest'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    testImplementation group: 'net.digitaltsunami', name: 'pojot', version: "${pojotVersion}"
+    testImplementation group: 'org.hamcrest', name: 'hamcrest-core', version: "${hamcrestVersion}"
+    testImplementation group: 'org.hamcrest', name: 'hamcrest-library', version: "${hamcrestVersion}"
+    testImplementation group: 'junit', name: 'junit', version: "${junitVersion}"
+}
+
+repositories {
+    mavenCentral()
+    jcenter()
+}
