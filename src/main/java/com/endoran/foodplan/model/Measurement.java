@@ -1,27 +1,47 @@
 package com.endoran.foodplan.model;
 
-public class Measurement {
-    private float quantity;
-    private MeasurementCategory measurementCategory;
+import java.math.BigDecimal;
+import java.util.Objects;
 
-    public Measurement(int quantity, MeasurementCategory measurementCategory) {
-        this.quantity = quantity;
-        this.measurementCategory = measurementCategory;
+public class Measurement {
+
+    private BigDecimal quantity;
+    private MeasurementUnit unit;
+
+    public Measurement() {
     }
 
-    public float getQuantity() {
+    public Measurement(BigDecimal quantity, MeasurementUnit unit) {
+        this.quantity = quantity;
+        this.unit = unit;
+    }
+
+    public BigDecimal getQuantity() {
         return quantity;
     }
 
-    public MeasurementCategory getMeasurementCategory() {
-        return measurementCategory;
-    }
-
-    public void setQuantity(float quantity) {
+    public void setQuantity(BigDecimal quantity) {
         this.quantity = quantity;
     }
 
-    public void setMeasurementCategory(MeasurementCategory measurementCategory) {
-        this.measurementCategory = measurementCategory;
+    public MeasurementUnit getUnit() {
+        return unit;
+    }
+
+    public void setUnit(MeasurementUnit unit) {
+        this.unit = unit;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Measurement that = (Measurement) o;
+        return Objects.equals(quantity, that.quantity) && unit == that.unit;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(quantity, unit);
     }
 }

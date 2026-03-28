@@ -1,9 +1,14 @@
 package com.endoran.foodplan.repository;
 
+import com.endoran.foodplan.model.GroceryCategory;
 import com.endoran.foodplan.model.Ingredient;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.stereotype.Repository;
 
-@Repository
+import java.util.List;
+
 public interface IngredientRepository extends MongoRepository<Ingredient, String> {
+
+    List<Ingredient> findByNameContainingIgnoreCase(String name);
+
+    List<Ingredient> findByGroceryCategory(GroceryCategory groceryCategory);
 }
