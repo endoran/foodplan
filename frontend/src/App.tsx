@@ -8,6 +8,8 @@ import { RecipeListPage } from './recipes/RecipeListPage';
 import { RecipeDetailPage } from './recipes/RecipeDetailPage';
 import { RecipeFormPage } from './recipes/RecipeFormPage';
 import { CalendarPage } from './calendar/CalendarPage';
+import { InventoryPage } from './inventory/InventoryPage';
+import { ShoppingListPage } from './inventory/ShoppingListPage';
 
 export function App() {
   return (
@@ -22,6 +24,8 @@ export function App() {
             <Route path="/recipes/:id" element={<ProtectedRoute><RecipeDetailPage /></ProtectedRoute>} />
             <Route path="/recipes/:id/edit" element={<ProtectedRoute><RecipeFormPage /></ProtectedRoute>} />
             <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
+            <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
+            <Route path="/shopping-list" element={<ProtectedRoute><ShoppingListPage /></ProtectedRoute>} />
             <Route path="/" element={<Navigate to="/recipes" replace />} />
           </Route>
         </Routes>

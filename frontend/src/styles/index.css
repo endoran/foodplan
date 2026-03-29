@@ -253,6 +253,18 @@ body {
   font-size: 0.875rem;
 }
 
+/* Shopping List Controls */
+.shopping-controls {
+  display: flex; align-items: flex-end; gap: 1rem; margin-bottom: 1.5rem;
+  padding: 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.shopping-controls label {
+  display: flex; flex-direction: column; gap: 0.25rem; font-weight: 500; font-size: 0.875rem;
+}
+.shopping-controls input[type="date"] {
+  padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.875rem;
+}
+
 /* Responsive */
 @media (max-width: 640px) {
   .content { padding: 1rem; }
