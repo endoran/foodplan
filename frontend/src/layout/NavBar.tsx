@@ -16,6 +16,7 @@ export function NavBar() {
       {isAuthenticated && (
         <div className="nav-links">
           <Link to="/recipes">Recipes</Link>
+          <Link to="/calendar">Calendar</Link>
           <span className="nav-user">{user?.email}</span>
           <button onClick={handleLogout} className="btn btn-small">Logout</button>
         </div>
