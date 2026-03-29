@@ -1,5 +1,6 @@
 package com.endoran.foodplan.controller;
 
+import com.endoran.foodplan.model.DietaryTag;
 import com.endoran.foodplan.model.GroceryCategory;
 import com.endoran.foodplan.model.MeasurementUnit;
 import com.endoran.foodplan.model.StorageCategory;
@@ -24,5 +25,10 @@ public class ReferenceDataController {
     @GetMapping("/grocery-categories")
     public GroceryCategory[] getGroceryCategories() {
         return GroceryCategory.values();
+    }
+
+    @GetMapping("/dietary-tags")
+    public DietaryTag[] getDietaryTags() {
+        return DietaryTag.values();
     }
 }

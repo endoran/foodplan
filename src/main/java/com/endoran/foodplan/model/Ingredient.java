@@ -3,7 +3,9 @@ package com.endoran.foodplan.model;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 @Document(collection = "ingredients")
 public class Ingredient {
@@ -14,6 +16,7 @@ public class Ingredient {
     private String name;
     private StorageCategory storageCategory;
     private GroceryCategory groceryCategory;
+    private Set<DietaryTag> dietaryTags = new HashSet<>();
 
     public String getId() {
         return id;
@@ -53,6 +56,14 @@ public class Ingredient {
 
     public void setGroceryCategory(GroceryCategory groceryCategory) {
         this.groceryCategory = groceryCategory;
+    }
+
+    public Set<DietaryTag> getDietaryTags() {
+        return dietaryTags;
+    }
+
+    public void setDietaryTags(Set<DietaryTag> dietaryTags) {
+        this.dietaryTags = dietaryTags;
     }
 
     @Override

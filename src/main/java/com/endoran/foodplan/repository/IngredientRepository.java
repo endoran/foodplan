@@ -1,5 +1,6 @@
 package com.endoran.foodplan.repository;
 
+import com.endoran.foodplan.model.DietaryTag;
 import com.endoran.foodplan.model.GroceryCategory;
 import com.endoran.foodplan.model.Ingredient;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -17,4 +18,6 @@ public interface IngredientRepository extends MongoRepository<Ingredient, String
     List<Ingredient> findByOrgIdAndNameContainingIgnoreCase(String orgId, String name);
 
     List<Ingredient> findByOrgIdAndGroceryCategory(String orgId, GroceryCategory groceryCategory);
+
+    List<Ingredient> findByOrgIdAndDietaryTagsContaining(String orgId, DietaryTag dietaryTag);
 }

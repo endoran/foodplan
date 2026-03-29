@@ -2,6 +2,8 @@ package com.endoran.foodplan.model;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class IngredientTest {
@@ -53,5 +55,21 @@ class IngredientTest {
         b.setName("salt");
 
         assertNotEquals(a, b);
+    }
+
+    @Test
+    void dietaryTagsDefaultToEmptySet() {
+        Ingredient i = new Ingredient();
+        assertNotNull(i.getDietaryTags());
+        assertTrue(i.getDietaryTags().isEmpty());
+    }
+
+    @Test
+    void dietaryTagsSetterAndGetter() {
+        Ingredient i = new Ingredient();
+        i.setDietaryTags(Set.of(DietaryTag.GLUTEN_FREE, DietaryTag.DAIRY_FREE));
+        assertEquals(2, i.getDietaryTags().size());
+        assertTrue(i.getDietaryTags().contains(DietaryTag.GLUTEN_FREE));
+        assertTrue(i.getDietaryTags().contains(DietaryTag.DAIRY_FREE));
     }
 }
