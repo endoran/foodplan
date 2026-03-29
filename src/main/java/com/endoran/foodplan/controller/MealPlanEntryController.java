@@ -73,6 +73,14 @@ public class MealPlanEntryController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/confirm")
+    public ResponseEntity<MealPlanEntryResponse> confirm(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String id) {
+        String orgId = jwt.getClaimAsString("orgId");
+        return ResponseEntity.ok(mealPlanEntryService.confirm(orgId, id));
+    }
+
     @ExceptionHandler(MealPlanEntryNotFoundException.class)
     public ResponseEntity<Map<String, String>> handleNotFound(MealPlanEntryNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

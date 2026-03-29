@@ -1,5 +1,6 @@
 package com.endoran.foodplan.dto;
 
+import com.endoran.foodplan.model.MealStatus;
 import com.endoran.foodplan.model.MealType;
 
 import java.time.LocalDate;
@@ -13,5 +14,6 @@ public record MealPlanEntryResponse(
         String recipeName,
         int servings,
         String notes,
+        MealStatus status,
         List<DietaryWarning> warnings
 ) {}

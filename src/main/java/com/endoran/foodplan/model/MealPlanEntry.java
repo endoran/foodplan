@@ -17,6 +17,7 @@ public class MealPlanEntry {
     private String recipeName;
     private int servings = 1;
     private String notes;
+    private MealStatus status = MealStatus.PLANNED;
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -41,4 +42,7 @@ public class MealPlanEntry {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public MealStatus getStatus() { return status; }
+    public void setStatus(MealStatus status) { this.status = status; }
 }

@@ -5,14 +5,19 @@ import com.endoran.foodplan.dto.DietaryWarning;
 import com.endoran.foodplan.dto.MealPlanEntryResponse;
 import com.endoran.foodplan.dto.UpdateMealPlanEntryRequest;
 import com.endoran.foodplan.model.Ingredient;
+import com.endoran.foodplan.model.InventoryItem;
 import com.endoran.foodplan.model.MealPlanEntry;
+import com.endoran.foodplan.model.MealStatus;
 import com.endoran.foodplan.model.MealType;
 import com.endoran.foodplan.model.Recipe;
 import com.endoran.foodplan.repository.IngredientRepository;
+import com.endoran.foodplan.repository.InventoryItemRepository;
 import com.endoran.foodplan.repository.MealPlanEntryRepository;
 import com.endoran.foodplan.repository.RecipeRepository;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
@@ -23,13 +28,16 @@ public class MealPlanEntryService {
     private final MealPlanEntryRepository mealPlanEntryRepository;
     private final RecipeRepository recipeRepository;
     private final IngredientRepository ingredientRepository;
+    private final InventoryItemRepository inventoryItemRepository;
 
     public MealPlanEntryService(MealPlanEntryRepository mealPlanEntryRepository,
                                 RecipeRepository recipeRepository,
-                                IngredientRepository ingredientRepository) {
+                                IngredientRepository ingredientRepository,
+                                InventoryItemRepository inventoryItemRepository) {
         this.mealPlanEntryRepository = mealPlanEntryRepository;
         this.recipeRepository = recipeRepository;
         this.ingredientRepository = ingredientRepository;
+        this.inventoryItemRepository = inventoryItemRepository;
     }
 
     public MealPlanEntryResponse create(String orgId, CreateMealPlanEntryRequest request) {
@@ -83,6 +91,35 @@ public class MealPlanEntryService {
         mealPlanEntryRepository.deleteById(entry.getId());
     }
 
+    public MealPlanEntryResponse confirm(String orgId, String id) {
+        MealPlanEntry entry = findByIdAndOrg(orgId, id);
+        if (entry.getStatus() == MealStatus.CONFIRMED) {
+            return toResponse(entry);
+        }
+
+        Recipe recipe = findRecipeByIdAndOrg(orgId, entry.getRecipeId());
+        BigDecimal scaleFactor = BigDecimal.valueOf(entry.getServings())
+                .divide(BigDecimal.valueOf(recipe.getBaseServings()), 10, RoundingMode.HALF_UP);
+
+        for (var ri : recipe.getIngredients()) {
+            BigDecimal scaledQty = ri.getMeasurement().getQuantity()
+                    .multiply(scaleFactor)
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            inventoryItemRepository.findByOrgIdAndIngredientIdAndUnit(
+                    orgId, ri.getIngredientId(), ri.getMeasurement().getUnit()
+            ).ifPresent(item -> {
+                BigDecimal newQty = item.getQuantity().subtract(scaledQty).max(BigDecimal.ZERO);
+                item.setQuantity(newQty);
+                inventoryItemRepository.save(item);
+            });
+        }
+
+        entry.setStatus(MealStatus.CONFIRMED);
+        entry = mealPlanEntryRepository.save(entry);
+        return toResponse(entry);
+    }
+
     private MealPlanEntry findByIdAndOrg(String orgId, String id) {
         MealPlanEntry entry = mealPlanEntryRepository.findById(id)
                 .orElseThrow(() -> new MealPlanEntryNotFoundException(id));
@@ -130,6 +167,7 @@ public class MealPlanEntryService {
                 entry.getRecipeName(),
                 entry.getServings(),
                 entry.getNotes(),
+                entry.getStatus(),
                 warnings
         );
     }
