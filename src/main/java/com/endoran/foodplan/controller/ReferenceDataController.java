@@ -2,6 +2,7 @@ package com.endoran.foodplan.controller;
 
 import com.endoran.foodplan.model.DietaryTag;
 import com.endoran.foodplan.model.GroceryCategory;
+import com.endoran.foodplan.model.MealType;
 import com.endoran.foodplan.model.MeasurementUnit;
 import com.endoran.foodplan.model.StorageCategory;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,5 +31,10 @@ public class ReferenceDataController {
     @GetMapping("/dietary-tags")
     public DietaryTag[] getDietaryTags() {
         return DietaryTag.values();
+    }
+
+    @GetMapping("/meal-types")
+    public MealType[] getMealTypes() {
+        return MealType.values();
     }
 }
