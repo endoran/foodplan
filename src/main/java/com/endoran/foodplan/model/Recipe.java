@@ -14,6 +14,7 @@ public class Recipe {
     private String orgId;
     private String name;
     private String instructions;
+    private int baseServings = 1;
     private List<RecipeIngredient> ingredients = new ArrayList<>();
 
     public String getId() {
@@ -46,6 +47,14 @@ public class Recipe {
 
     public void setInstructions(String instructions) {
         this.instructions = instructions;
+    }
+
+    public int getBaseServings() {
+        return baseServings;
+    }
+
+    public void setBaseServings(int baseServings) {
+        this.baseServings = baseServings;
     }
 
     public List<RecipeIngredient> getIngredients() {

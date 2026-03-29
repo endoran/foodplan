@@ -54,4 +54,17 @@ class RecipeTest {
         assertEquals("Cheddar", r.getIngredients().get(0).getIngredientName());
         assertEquals(MeasurementUnit.CUP, r.getIngredients().get(0).getMeasurement().getUnit());
     }
+
+    @Test
+    void newRecipeHasDefaultBaseServingsOfOne() {
+        Recipe r = new Recipe();
+        assertEquals(1, r.getBaseServings());
+    }
+
+    @Test
+    void baseServingsSetterAndGetter() {
+        Recipe r = new Recipe();
+        r.setBaseServings(6);
+        assertEquals(6, r.getBaseServings());
+    }
 }
