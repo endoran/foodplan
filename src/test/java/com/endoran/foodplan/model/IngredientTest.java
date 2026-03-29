@@ -21,6 +21,14 @@ class IngredientTest {
     }
 
     @Test
+    void orgIdSetterAndGetter() {
+        Ingredient i = new Ingredient();
+        assertNull(i.getOrgId());
+        i.setOrgId("org1");
+        assertEquals("org1", i.getOrgId());
+    }
+
+    @Test
     void equalsSameIdAndName() {
         Ingredient a = new Ingredient();
         a.setId("1");

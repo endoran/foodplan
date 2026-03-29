@@ -29,6 +29,14 @@ class RecipeTest {
     }
 
     @Test
+    void orgIdSetterAndGetter() {
+        Recipe r = new Recipe();
+        assertNull(r.getOrgId());
+        r.setOrgId("org1");
+        assertEquals("org1", r.getOrgId());
+    }
+
+    @Test
     void canAddIngredients() {
         Recipe r = new Recipe();
 

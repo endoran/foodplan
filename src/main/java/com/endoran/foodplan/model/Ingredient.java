@@ -10,6 +10,7 @@ public class Ingredient {
 
     @Id
     private String id;
+    private String orgId;
     private String name;
     private StorageCategory storageCategory;
     private GroceryCategory groceryCategory;
@@ -20,6 +21,14 @@ public class Ingredient {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getOrgId() {
+        return orgId;
+    }
+
+    public void setOrgId(String orgId) {
+        this.orgId = orgId;
     }
 
     public String getName() {

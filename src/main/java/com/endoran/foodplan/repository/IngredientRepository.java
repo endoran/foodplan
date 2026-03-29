@@ -11,4 +11,10 @@ public interface IngredientRepository extends MongoRepository<Ingredient, String
     List<Ingredient> findByNameContainingIgnoreCase(String name);
 
     List<Ingredient> findByGroceryCategory(GroceryCategory groceryCategory);
+
+    List<Ingredient> findByOrgId(String orgId);
+
+    List<Ingredient> findByOrgIdAndNameContainingIgnoreCase(String orgId, String name);
+
+    List<Ingredient> findByOrgIdAndGroceryCategory(String orgId, GroceryCategory groceryCategory);
 }
