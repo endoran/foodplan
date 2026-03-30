@@ -1,6 +1,5 @@
 .gradle/
 build/
-!build/libs/*.jar
 .idea/
 .git/
 *.iml
@@ -12,3 +11,4 @@ build/
 out/
 bin/
 target/
+frontend/

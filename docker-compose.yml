@@ -12,7 +12,7 @@ services:
       retries: 5
       start_period: 10s
 
-  foodplan:
+  backend:
     build: .
     ports:
       - "8080:8080"
@@ -22,6 +22,13 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
 
 volumes:
   mongo-data:
