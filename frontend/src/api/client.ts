@@ -30,8 +30,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   if (!response.ok) {
-    const body = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new ApiError(body.error || `HTTP ${response.status}`, response.status);
+    const body = await response.json().catch(() => ({}));
+    let message = body.error || body.message;
+    if (!message) {
+      if (response.status === 403) message = 'Access denied — the server rejected this request';
+      else if (response.status === 404) message = 'Not found';
+      else if (response.status === 409) message = 'Conflict — this resource already exists';
+      else if (response.status >= 500) message = 'Server error — please try again later';
+      else message = `Request failed (HTTP ${response.status})`;
+    }
+    throw new ApiError(message, response.status);
   }
 
   if (response.status === 204) {
