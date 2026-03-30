@@ -2,10 +2,6 @@ package com.endoran.foodplan.service;
 
 import com.endoran.foodplan.dto.ImportedIngredientPreview;
 import com.endoran.foodplan.dto.ImportedRecipePreview;
-import com.endoran.foodplan.model.GroceryCategory;
-import com.endoran.foodplan.model.Ingredient;
-import com.endoran.foodplan.model.StorageCategory;
-import com.endoran.foodplan.repository.IngredientRepository;
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
 import org.apache.pdfbox.Loader;
@@ -31,17 +27,14 @@ public class RecipeScanService {
             "(?:time|prep|cook)\\s*:?\\s*(\\d+)\\s*(?:min|hour|hr)", Pattern.CASE_INSENSITIVE);
 
     private final RecipeImportService recipeImportService;
-    private final IngredientRepository ingredientRepository;
 
-    public RecipeScanService(RecipeImportService recipeImportService,
-                             IngredientRepository ingredientRepository) {
+    public RecipeScanService(RecipeImportService recipeImportService) {
         this.recipeImportService = recipeImportService;
-        this.ingredientRepository = ingredientRepository;
     }
 
-    public ImportedRecipePreview scanFile(String orgId, MultipartFile file) {
+    public ImportedRecipePreview scanFile(MultipartFile file) {
         String text = performOcr(file);
-        return parseScannedText(orgId, text);
+        return parseScannedText(text);
     }
 
     String performOcr(MultipartFile file) {
@@ -101,7 +94,7 @@ public class RecipeScanService {
         }
     }
 
-    ImportedRecipePreview parseScannedText(String orgId, String text) {
+    ImportedRecipePreview parseScannedText(String text) {
         String[] lines = text.split("\\n");
         List<String> nonEmpty = new ArrayList<>();
         for (String line : lines) {
@@ -166,14 +159,11 @@ public class RecipeScanService {
         // Slashes are only stripped when NOT followed by a digit (to preserve fractions like "1/2").
         List<ImportedIngredientPreview> ingredients = ingredientLines.stream()
                 .map(String::trim)
-                .map(line -> line.replaceFirst("^[\\-•*·]+\\s*", ""))
-                .map(line -> line.replaceFirst("^/(?!\\d)\\s*", ""))
+                .map(line -> line.replaceFirst("^[\\-•*·\\u2022\\u2023\\u25E6\\u2043]+\\s*", ""))
+                .map(line -> line.replaceFirst("^[/\\u2215\\u2044](?!\\d)\\s*", ""))
                 .filter(line -> !line.isEmpty())
                 .map(recipeImportService::parseIngredientText)
                 .toList();
-
-        // Auto-create unknown ingredients
-        autoCreateIngredients(orgId, ingredients);
 
         // Build instructions — merge continuation lines from multi-line OCR steps.
         // OCR reads document line numbers, so wrapped steps get incrementing numbers.
@@ -255,19 +245,4 @@ public class RecipeScanService {
         return new ImportedRecipePreview(title, instBuilder.toString().trim(), servings, ingredients, "scan");
     }
 
-    private void autoCreateIngredients(String orgId, List<ImportedIngredientPreview> ingredients) {
-        for (ImportedIngredientPreview ing : ingredients) {
-            List<Ingredient> existing = ingredientRepository.findByOrgIdAndNameContainingIgnoreCase(
-                    orgId, ing.name());
-            if (existing.isEmpty()) {
-                Ingredient newIng = new Ingredient();
-                newIng.setOrgId(orgId);
-                newIng.setName(ing.name());
-                newIng.setStorageCategory(StorageCategory.DRY);
-                newIng.setGroceryCategory(GroceryCategory.PRODUCE);
-                newIng.setNeedsReview(true);
-                ingredientRepository.save(newIng);
-            }
-        }
-    }
 }

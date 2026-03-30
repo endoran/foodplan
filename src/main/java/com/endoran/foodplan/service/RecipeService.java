@@ -4,9 +4,13 @@ import com.endoran.foodplan.dto.CreateRecipeRequest;
 import com.endoran.foodplan.dto.RecipeIngredientResponse;
 import com.endoran.foodplan.dto.RecipeResponse;
 import com.endoran.foodplan.dto.UpdateRecipeRequest;
+import com.endoran.foodplan.model.GroceryCategory;
+import com.endoran.foodplan.model.Ingredient;
 import com.endoran.foodplan.model.Measurement;
 import com.endoran.foodplan.model.Recipe;
 import com.endoran.foodplan.model.RecipeIngredient;
+import com.endoran.foodplan.model.StorageCategory;
+import com.endoran.foodplan.repository.IngredientRepository;
 import com.endoran.foodplan.repository.RecipeRepository;
 import org.springframework.stereotype.Service;
 
@@ -19,9 +23,11 @@ import java.util.List;
 public class RecipeService {
 
     private final RecipeRepository recipeRepository;
+    private final IngredientRepository ingredientRepository;
 
-    public RecipeService(RecipeRepository recipeRepository) {
+    public RecipeService(RecipeRepository recipeRepository, IngredientRepository ingredientRepository) {
         this.recipeRepository = recipeRepository;
+        this.ingredientRepository = ingredientRepository;
     }
 
     public RecipeResponse create(String orgId, CreateRecipeRequest request) {
@@ -31,6 +37,7 @@ public class RecipeService {
         recipe.setInstructions(request.instructions());
         recipe.setBaseServings(request.baseServings());
         recipe.setIngredients(toIngredients(request.ingredients()));
+        autoCreateIngredients(orgId, recipe.getIngredients());
         recipe = recipeRepository.save(recipe);
         return toResponse(recipe, null);
     }
@@ -116,5 +123,21 @@ public class RecipeService {
                 scaledQuantity,
                 ri.getMeasurement().getUnit()
         );
+    }
+
+    private void autoCreateIngredients(String orgId, List<RecipeIngredient> ingredients) {
+        for (RecipeIngredient ri : ingredients) {
+            List<Ingredient> existing = ingredientRepository.findByOrgIdAndNameContainingIgnoreCase(
+                    orgId, ri.getIngredientName());
+            if (existing.isEmpty()) {
+                Ingredient newIng = new Ingredient();
+                newIng.setOrgId(orgId);
+                newIng.setName(ri.getIngredientName());
+                newIng.setStorageCategory(StorageCategory.DRY);
+                newIng.setGroceryCategory(GroceryCategory.PRODUCE);
+                newIng.setNeedsReview(true);
+                ingredientRepository.save(newIng);
+            }
+        }
     }
 }

@@ -35,16 +35,35 @@ public class RecipeImportService {
     );
 
     private static final Map<String, String> UNIT_ALIASES = Map.ofEntries(
+            // Teaspoon
             Map.entry("teaspoon", "TSP"), Map.entry("teaspoons", "TSP"), Map.entry("tsp", "TSP"),
+            Map.entry("tep", "TSP"), Map.entry("t5p", "TSP"), Map.entry("tsp.", "TSP"),
+            // Tablespoon
             Map.entry("tablespoon", "TBSP"), Map.entry("tablespoons", "TBSP"), Map.entry("tbsp", "TBSP"),
+            Map.entry("tosp", "TBSP"), Map.entry("thsp", "TBSP"), Map.entry("tbsp.", "TBSP"),
+            Map.entry("tbs", "TBSP"), Map.entry("tabiespoon", "TBSP"), Map.entry("tabiespoons", "TBSP"),
+            Map.entry("tablespcon", "TBSP"), Map.entry("tablespo0n", "TBSP"),
+            // Cup
             Map.entry("cup", "CUP"), Map.entry("cups", "CUP"), Map.entry("c", "CUP"),
+            Map.entry("cuo", "CUP"), Map.entry("cus", "CUP"), Map.entry("cuos", "CUP"),
+            // Pint
             Map.entry("pint", "PINT"), Map.entry("pints", "PINT"),
+            // Quart
             Map.entry("quart", "QUART"), Map.entry("quarts", "QUART"),
+            // Gallon
             Map.entry("gallon", "GALLON"), Map.entry("gallons", "GALLON"),
+            // Ounce
             Map.entry("ounce", "OZ"), Map.entry("ounces", "OZ"), Map.entry("oz", "OZ"),
+            Map.entry("0z", "OZ"), Map.entry("oz.", "OZ"),
+            // Pound
             Map.entry("pound", "LBS"), Map.entry("pounds", "LBS"), Map.entry("lb", "LBS"),
-            Map.entry("lbs", "LBS"), Map.entry("pinch", "PINCH"),
+            Map.entry("lbs", "LBS"), Map.entry("1b", "LBS"), Map.entry("1bs", "LBS"),
+            Map.entry("ibs", "LBS"), Map.entry("ib", "LBS"),
+            // Pinch
+            Map.entry("pinch", "PINCH"),
+            // Piece
             Map.entry("piece", "PIECE"), Map.entry("pieces", "PIECE"),
+            // Descriptive units
             Map.entry("whole", "UNIT"), Map.entry("large", "UNIT"), Map.entry("medium", "UNIT"),
             Map.entry("small", "UNIT"), Map.entry("clove", "UNIT"), Map.entry("cloves", "UNIT")
     );
@@ -168,12 +187,24 @@ public class RecipeImportService {
             ingredientName = normalized.substring(qtyMatcher.end()).trim();
         }
 
-        // Extract unit
+        // Extract unit (exact match via regex)
         Matcher unitMatcher = UNIT_PATTERN.matcher(normalized);
         if (unitMatcher.find()) {
             String matchedUnit = unitMatcher.group(1).toLowerCase();
             unit = UNIT_ALIASES.getOrDefault(matchedUnit, "UNIT");
             ingredientName = normalized.substring(unitMatcher.end()).trim();
+        } else if (qtyMatcher.hitEnd() || qtyMatcher.find(0)) {
+            // Fuzzy fallback: check if the first word after quantity is close to a known unit
+            String afterQty = ingredientName;
+            String[] words = afterQty.split("\\s+", 2);
+            if (words.length >= 1 && !words[0].isEmpty()) {
+                String candidate = words[0].toLowerCase().replaceAll("\\.$", "");
+                String fuzzyMatch = fuzzyMatchUnit(candidate);
+                if (fuzzyMatch != null) {
+                    unit = fuzzyMatch;
+                    ingredientName = words.length > 1 ? words[1].trim() : "";
+                }
+            }
         }
 
         // Clean up ingredient name
@@ -217,6 +248,38 @@ public class RecipeImportService {
         } catch (Exception e) {
             return BigDecimal.ONE;
         }
+    }
+
+    private String fuzzyMatchUnit(String candidate) {
+        if (candidate.length() < 2 || candidate.length() > 12) return null;
+        // Don't fuzzy-match words that look like ingredient names (all alpha, > 5 chars, no resemblance)
+        int bestDist = Integer.MAX_VALUE;
+        String bestUnit = null;
+        for (Map.Entry<String, String> entry : UNIT_ALIASES.entrySet()) {
+            String alias = entry.getKey();
+            // Only fuzzy-match against aliases of similar length
+            if (Math.abs(alias.length() - candidate.length()) > 1) continue;
+            int dist = editDistance(candidate, alias);
+            if (dist <= 1 && dist < bestDist) {
+                bestDist = dist;
+                bestUnit = entry.getValue();
+                if (dist == 0) break;
+            }
+        }
+        return bestUnit;
+    }
+
+    private static int editDistance(String a, String b) {
+        int[][] dp = new int[a.length() + 1][b.length() + 1];
+        for (int i = 0; i <= a.length(); i++) dp[i][0] = i;
+        for (int j = 0; j <= b.length(); j++) dp[0][j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            for (int j = 1; j <= b.length(); j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                dp[i][j] = Math.min(Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1), dp[i - 1][j - 1] + cost);
+            }
+        }
+        return dp[a.length()][b.length()];
     }
 
     private String normalizeUnicodeFractions(String text) {
