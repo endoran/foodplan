@@ -25,8 +25,12 @@ public class RecipeScanService {
             "(?:serves?|servings?|yield|makes?)\\s*:?\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern TIME_PATTERN = Pattern.compile(
             "(?:time|prep|cook)\\s*:?\\s*(\\d+)\\s*(?:min|hour|hr)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern SUB_SECTION_HEADER = Pattern.compile(
+    // Sub-section headers: lines with a colon like "For the Marinade:", "Sauce:"
+    // OR short all-letter lines (≤4 words, no digits) like "Soup", "Chicken Rub"
+    private static final Pattern SUB_SECTION_WITH_COLON = Pattern.compile(
             "^(?:for\\s+)?(?:the\\s+)?[\\p{L} ]+:\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SUB_SECTION_SHORT_LABEL = Pattern.compile(
+            "^[\\p{L}][\\p{L} ]{0,30}$");
 
     private final RecipeImportService recipeImportService;
 
@@ -142,12 +146,27 @@ public class RecipeScanService {
                 continue;
             }
 
-            // Skip sub-recipe section headers ("For the Marinade:", "Sauce:", etc.)
-            if (!inInstructions && SUB_SECTION_HEADER.matcher(line).matches()) {
-                continue;
+            // Skip sub-recipe section headers
+            if (!inInstructions) {
+                // Lines with colon: "For the Marinade:", "Sauce:"
+                if (SUB_SECTION_WITH_COLON.matcher(line).matches()) {
+                    continue;
+                }
+                // Short all-letter lines (≤4 words) without digits: "Soup", "Chicken Rub"
+                if (SUB_SECTION_SHORT_LABEL.matcher(line).matches()
+                        && line.split("\\s+").length <= 4) {
+                    continue;
+                }
             }
 
             if (inInstructions) {
+                // Filter OCR garbage: short non-numeric, non-header lines
+                boolean isShortGarbage = line.length() <= 5
+                        && !Character.isDigit(line.charAt(0))
+                        && !line.toLowerCase().matches("notes?|tips?");
+                if (isShortGarbage) {
+                    continue;
+                }
                 instructionLines.add(line);
             } else {
                 ingredientLines.add(line);
@@ -173,59 +192,92 @@ public class RecipeScanService {
                 .toList();
 
         // Build instructions — merge continuation lines from multi-line OCR steps.
-        // OCR reads document line numbers, so wrapped steps get incrementing numbers.
-        // Heuristic: a new step starts with a number + "." + uppercase letter (sentence start).
-        // A continuation line starts with a number + "." + lowercase (mid-sentence wrap).
-        // Section headers like "Notes" and bullet lines (+/*/-) break the continuation.
+        //
+        // Two modes depending on how the OCR captured the numbering:
+        //   "inline"   — number + text on same line:  "1. Heat a pan on medium."
+        //   "orphaned" — number alone on its own line: "1."  then "Heat a pan..."
+        //
+        // Inline mode: uppercase after "N." = new step; lowercase = continuation.
+        // Orphaned mode: skip bare number lines; each uppercase-starting line = new step;
+        //   lowercase-starting lines = continuation of previous step.
+        //
+        // Notes/Tips sections and bullet lines are handled in both modes.
         List<String> mergedInstructions = new ArrayList<>();
         List<String> notes = new ArrayList<>();
-        java.util.regex.Pattern stepPattern = java.util.regex.Pattern.compile("^\\d+\\.\\s*([A-Z].*)");
+        java.util.regex.Pattern inlineStepPattern = java.util.regex.Pattern.compile("^\\d+\\.\\s+([A-Z].+)");
+        java.util.regex.Pattern bareNumberPattern = java.util.regex.Pattern.compile("^\\d+\\.\\s*$");
         java.util.regex.Pattern numPrefixPattern = java.util.regex.Pattern.compile("^\\d+\\.\\s*(.*)");
         java.util.regex.Pattern notesHeaderPattern = java.util.regex.Pattern.compile(
                 "^(?:\\d+\\.\\s*)?(?i)(notes?|tips?|variations?)\\s*$");
         java.util.regex.Pattern bulletPattern = java.util.regex.Pattern.compile(
                 "^(?:\\d+\\.\\s*)?[+*\\-•]\\s*(.+)");
-        boolean hasNumberedLines = instructionLines.stream()
-                .anyMatch(l -> numPrefixPattern.matcher(l).matches());
+
+        // Determine mode: count inline vs orphaned numbered lines
+        long inlineCount = instructionLines.stream()
+                .filter(l -> inlineStepPattern.matcher(l).matches())
+                .count();
+        long orphanedCount = instructionLines.stream()
+                .filter(l -> bareNumberPattern.matcher(l).matches())
+                .count();
+        boolean useOrphanedMode = orphanedCount > inlineCount;
         boolean inNotes = false;
 
-        if (hasNumberedLines) {
-            for (String line : instructionLines) {
-                // Check for notes/tips section header
-                if (notesHeaderPattern.matcher(line).matches()) {
-                    inNotes = true;
-                    continue;
-                }
+        for (String line : instructionLines) {
+            // Notes/tips section header
+            if (notesHeaderPattern.matcher(line).matches()) {
+                inNotes = true;
+                continue;
+            }
 
-                // Check for bullet lines (+ / * / -)
-                java.util.regex.Matcher bulletMatcher = bulletPattern.matcher(line);
-                if (bulletMatcher.matches()) {
-                    if (inNotes) {
-                        notes.add(bulletMatcher.group(1));
-                    } else {
-                        // Bullet in instructions area — treat as a new item
-                        mergedInstructions.add(bulletMatcher.group(1));
-                    }
-                    continue;
-                }
-
+            // Bullet lines (+ / * / -)
+            java.util.regex.Matcher bulletMatcher = bulletPattern.matcher(line);
+            if (bulletMatcher.matches()) {
                 if (inNotes) {
-                    // Non-bullet continuation in notes section
-                    if (!notes.isEmpty()) {
-                        int last = notes.size() - 1;
-                        java.util.regex.Matcher numMatcher = numPrefixPattern.matcher(line);
-                        String content = numMatcher.matches() ? numMatcher.group(1) : line;
+                    notes.add(bulletMatcher.group(1));
+                } else {
+                    mergedInstructions.add(bulletMatcher.group(1));
+                }
+                continue;
+            }
+
+            if (inNotes) {
+                // Non-bullet continuation in notes section
+                if (!notes.isEmpty()) {
+                    int last = notes.size() - 1;
+                    java.util.regex.Matcher numMatcher = numPrefixPattern.matcher(line);
+                    String content = numMatcher.matches() ? numMatcher.group(1) : line;
+                    if (!content.isEmpty()) {
                         notes.set(last, notes.get(last) + " " + content);
                     }
-                    continue;
                 }
+                continue;
+            }
 
-                java.util.regex.Matcher stepMatcher = stepPattern.matcher(line);
+            // Skip bare number lines ("10.", "11.") in both modes
+            if (bareNumberPattern.matcher(line).matches()) {
+                continue;
+            }
+
+            if (useOrphanedMode) {
+                // Orphaned mode: each uppercase-starting sentence is a new step
+                // Strip any leading ". " from OCR artifacts (". Once roasted...")
+                String cleaned = line.replaceFirst("^\\d*\\.\\s*", "").trim();
+                if (cleaned.isEmpty()) continue;
+
+                if (Character.isUpperCase(cleaned.charAt(0))) {
+                    mergedInstructions.add(cleaned);
+                } else if (!mergedInstructions.isEmpty()) {
+                    int last = mergedInstructions.size() - 1;
+                    mergedInstructions.set(last, mergedInstructions.get(last) + " " + cleaned);
+                } else {
+                    mergedInstructions.add(cleaned);
+                }
+            } else {
+                // Inline mode: "N. Uppercase" = new step, lowercase = continuation
+                java.util.regex.Matcher stepMatcher = inlineStepPattern.matcher(line);
                 if (stepMatcher.matches()) {
-                    // New step — starts with number + uppercase
                     mergedInstructions.add(stepMatcher.group(1));
                 } else if (!mergedInstructions.isEmpty()) {
-                    // Continuation — strip any stray number prefix and append
                     java.util.regex.Matcher numMatcher = numPrefixPattern.matcher(line);
                     String content = numMatcher.matches() ? numMatcher.group(1) : line;
                     int last = mergedInstructions.size() - 1;
@@ -234,8 +286,6 @@ public class RecipeScanService {
                     mergedInstructions.add(line);
                 }
             }
-        } else {
-            mergedInstructions.addAll(instructionLines);
         }
 
         StringBuilder instBuilder = new StringBuilder();

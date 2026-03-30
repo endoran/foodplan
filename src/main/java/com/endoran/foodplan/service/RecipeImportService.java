@@ -40,8 +40,9 @@ public class RecipeImportService {
             Map.entry("tep", "TSP"), Map.entry("t5p", "TSP"), Map.entry("tsp.", "TSP"),
             // Tablespoon
             Map.entry("tablespoon", "TBSP"), Map.entry("tablespoons", "TBSP"), Map.entry("tbsp", "TBSP"),
-            Map.entry("tosp", "TBSP"), Map.entry("thsp", "TBSP"), Map.entry("tbsp.", "TBSP"),
-            Map.entry("tbs", "TBSP"), Map.entry("tabiespoon", "TBSP"), Map.entry("tabiespoons", "TBSP"),
+            Map.entry("tosp", "TBSP"), Map.entry("thsp", "TBSP"), Map.entry("tposp", "TBSP"),
+            Map.entry("tbsp.", "TBSP"), Map.entry("tbs", "TBSP"),
+            Map.entry("tabiespoon", "TBSP"), Map.entry("tabiespoons", "TBSP"),
             Map.entry("tablespcon", "TBSP"), Map.entry("tablespo0n", "TBSP"),
             // Cup
             Map.entry("cup", "CUP"), Map.entry("cups", "CUP"), Map.entry("c", "CUP"),
@@ -59,13 +60,19 @@ public class RecipeImportService {
             Map.entry("pound", "LBS"), Map.entry("pounds", "LBS"), Map.entry("lb", "LBS"),
             Map.entry("lbs", "LBS"), Map.entry("1b", "LBS"), Map.entry("1bs", "LBS"),
             Map.entry("ibs", "LBS"), Map.entry("ib", "LBS"),
+            // Can
+            Map.entry("can", "UNIT"), Map.entry("cans", "UNIT"),
             // Pinch
             Map.entry("pinch", "PINCH"),
             // Piece
             Map.entry("piece", "PIECE"), Map.entry("pieces", "PIECE"),
             // Descriptive units
             Map.entry("whole", "UNIT"), Map.entry("large", "UNIT"), Map.entry("medium", "UNIT"),
-            Map.entry("small", "UNIT"), Map.entry("clove", "UNIT"), Map.entry("cloves", "UNIT")
+            Map.entry("small", "UNIT"), Map.entry("clove", "UNIT"), Map.entry("cloves", "UNIT"),
+            Map.entry("bulb", "UNIT"), Map.entry("bunch", "UNIT"), Map.entry("head", "UNIT"),
+            Map.entry("stalk", "UNIT"), Map.entry("stalks", "UNIT"),
+            Map.entry("sprig", "UNIT"), Map.entry("sprigs", "UNIT"),
+            Map.entry("fresh", "UNIT")
     );
 
     private static final Pattern UNIT_PATTERN;
@@ -208,8 +215,11 @@ public class RecipeImportService {
         }
 
         // Clean up ingredient name
-        ingredientName = ingredientName.replaceAll("^of\\s+", "")
-                .replaceAll(",.*", "")
+        ingredientName = ingredientName
+                .replaceFirst("^/\\s*", "")           // strip alternate-description separator ("4lbs / 1 Whole...")
+                .replaceFirst("^\\d+(?:[./]\\d+)?\\s+", "") // strip second quantity after separator
+                .replaceAll("^of\\s+", "")
+                .replaceAll(",.*", "")                // strip prep notes after comma
                 .trim();
 
         if (ingredientName.isEmpty()) {
@@ -252,15 +262,16 @@ public class RecipeImportService {
 
     private String fuzzyMatchUnit(String candidate) {
         if (candidate.length() < 2 || candidate.length() > 12) return null;
-        // Don't fuzzy-match words that look like ingredient names (all alpha, > 5 chars, no resemblance)
+        // Allow distance 2 for longer words (5+ chars), distance 1 for short abbreviations
+        int maxDist = candidate.length() >= 5 ? 2 : 1;
         int bestDist = Integer.MAX_VALUE;
         String bestUnit = null;
         for (Map.Entry<String, String> entry : UNIT_ALIASES.entrySet()) {
             String alias = entry.getKey();
             // Only fuzzy-match against aliases of similar length
-            if (Math.abs(alias.length() - candidate.length()) > 1) continue;
+            if (Math.abs(alias.length() - candidate.length()) > maxDist) continue;
             int dist = editDistance(candidate, alias);
-            if (dist <= 1 && dist < bestDist) {
+            if (dist <= maxDist && dist < bestDist) {
                 bestDist = dist;
                 bestUnit = entry.getValue();
                 if (dist == 0) break;
