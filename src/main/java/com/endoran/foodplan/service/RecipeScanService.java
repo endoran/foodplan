@@ -175,14 +175,50 @@ public class RecipeScanService {
         // OCR reads document line numbers, so wrapped steps get incrementing numbers.
         // Heuristic: a new step starts with a number + "." + uppercase letter (sentence start).
         // A continuation line starts with a number + "." + lowercase (mid-sentence wrap).
+        // Section headers like "Notes" and bullet lines (+/*/-) break the continuation.
         List<String> mergedInstructions = new ArrayList<>();
+        List<String> notes = new ArrayList<>();
         java.util.regex.Pattern stepPattern = java.util.regex.Pattern.compile("^\\d+\\.\\s*([A-Z].*)");
         java.util.regex.Pattern numPrefixPattern = java.util.regex.Pattern.compile("^\\d+\\.\\s*(.*)");
+        java.util.regex.Pattern notesHeaderPattern = java.util.regex.Pattern.compile(
+                "^(?:\\d+\\.\\s*)?(?i)(notes?|tips?|variations?)\\s*$");
+        java.util.regex.Pattern bulletPattern = java.util.regex.Pattern.compile(
+                "^(?:\\d+\\.\\s*)?[+*\\-•]\\s*(.+)");
         boolean hasNumberedLines = instructionLines.stream()
                 .anyMatch(l -> numPrefixPattern.matcher(l).matches());
+        boolean inNotes = false;
 
         if (hasNumberedLines) {
             for (String line : instructionLines) {
+                // Check for notes/tips section header
+                if (notesHeaderPattern.matcher(line).matches()) {
+                    inNotes = true;
+                    continue;
+                }
+
+                // Check for bullet lines (+ / * / -)
+                java.util.regex.Matcher bulletMatcher = bulletPattern.matcher(line);
+                if (bulletMatcher.matches()) {
+                    if (inNotes) {
+                        notes.add(bulletMatcher.group(1));
+                    } else {
+                        // Bullet in instructions area — treat as a new item
+                        mergedInstructions.add(bulletMatcher.group(1));
+                    }
+                    continue;
+                }
+
+                if (inNotes) {
+                    // Non-bullet continuation in notes section
+                    if (!notes.isEmpty()) {
+                        int last = notes.size() - 1;
+                        java.util.regex.Matcher numMatcher = numPrefixPattern.matcher(line);
+                        String content = numMatcher.matches() ? numMatcher.group(1) : line;
+                        notes.set(last, notes.get(last) + " " + content);
+                    }
+                    continue;
+                }
+
                 java.util.regex.Matcher stepMatcher = stepPattern.matcher(line);
                 if (stepMatcher.matches()) {
                     // New step — starts with number + uppercase
@@ -204,6 +240,12 @@ public class RecipeScanService {
         StringBuilder instBuilder = new StringBuilder();
         for (int i = 0; i < mergedInstructions.size(); i++) {
             instBuilder.append(i + 1).append(". ").append(mergedInstructions.get(i)).append("\n");
+        }
+        if (!notes.isEmpty()) {
+            instBuilder.append("\nNotes:\n");
+            for (String note : notes) {
+                instBuilder.append("- ").append(note).append("\n");
+            }
         }
 
         return new ImportedRecipePreview(title, instBuilder.toString().trim(), servings, ingredients, "scan");
