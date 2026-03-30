@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { apiGet, apiPost, apiPut } from '../api/client';
 
 const STORAGE_CATEGORIES = ['DRY', 'FROZEN', 'FRESH', 'REFRIGERATED'];
-const GROCERY_CATEGORIES = ['PRODUCE', 'MEAT', 'DAIRY', 'BAKING', 'ETHNIC', 'BULK', 'CANNED', 'BAKERY', 'DELI', 'HOUSEHOLD'];
-const DIETARY_TAGS = ['GLUTEN_FREE', 'DAIRY_FREE', 'NUT_FREE', 'VEGAN', 'VEGETARIAN', 'KOSHER', 'HALAL', 'LOW_SODIUM', 'SUGAR_FREE', 'ORGANIC'];
+const GROCERY_CATEGORIES = ['PRODUCE', 'MEAT', 'DAIRY', 'BAKING', 'SPICES', 'ETHNIC', 'BULK', 'CANNED', 'BAKERY', 'DELI', 'HOUSEHOLD'];
+const DIETARY_TAGS = ['GLUTEN_FREE', 'DAIRY_FREE', 'NUT_FREE', 'VEGAN', 'VEGETARIAN', 'SUGAR_FREE'];
 
 interface IngredientDetail {
   id: string;

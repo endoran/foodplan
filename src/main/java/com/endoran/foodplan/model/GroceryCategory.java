@@ -1,5 +1,5 @@
 package com.endoran.foodplan.model;
 
 public enum GroceryCategory {
-    PRODUCE, MEAT, DAIRY, BAKING, ETHNIC, BULK, CANNED, BAKERY, DELI, HOUSEHOLD
+    PRODUCE, MEAT, DAIRY, BAKING, SPICES, ETHNIC, BULK, CANNED, BAKERY, DELI, HOUSEHOLD
 }

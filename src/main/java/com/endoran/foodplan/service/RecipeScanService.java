@@ -25,6 +25,8 @@ public class RecipeScanService {
             "(?:serves?|servings?|yield|makes?)\\s*:?\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern TIME_PATTERN = Pattern.compile(
             "(?:time|prep|cook)\\s*:?\\s*(\\d+)\\s*(?:min|hour|hr)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SUB_SECTION_HEADER = Pattern.compile(
+            "^(?:for\\s+)?(?:the\\s+)?[\\p{L} ]+:\\s*$", Pattern.CASE_INSENSITIVE);
 
     private final RecipeImportService recipeImportService;
 
@@ -140,6 +142,11 @@ public class RecipeScanService {
                 continue;
             }
 
+            // Skip sub-recipe section headers ("For the Marinade:", "Sauce:", etc.)
+            if (!inInstructions && SUB_SECTION_HEADER.matcher(line).matches()) {
+                continue;
+            }
+
             if (inInstructions) {
                 instructionLines.add(line);
             } else {
@@ -154,13 +161,13 @@ public class RecipeScanService {
             ingredientLines = new ArrayList<>(ingredientLines.subList(0, split));
         }
 
-        // Parse ingredients — strip leading bullets/slashes from OCR artifacts.
-        // Leading whitespace is trimmed first so "  / item" is caught.
-        // Slashes are only stripped when NOT followed by a digit (to preserve fractions like "1/2").
+        // Parse ingredients — strip leading OCR artifacts (bullets, slashes, dashes, etc.).
+        // Trim whitespace, then strip any leading non-alphanumeric junk until we hit a
+        // letter or digit (the start of a quantity or ingredient name).
         List<ImportedIngredientPreview> ingredients = ingredientLines.stream()
                 .map(String::trim)
-                .map(line -> line.replaceFirst("^[\\-•*·\\u2022\\u2023\\u25E6\\u2043]+\\s*", ""))
-                .map(line -> line.replaceFirst("^[/\\u2215\\u2044](?!\\d)\\s*", ""))
+                .map(line -> line.replaceFirst("^[^\\p{L}\\p{N}]+", ""))
+                .map(String::trim)
                 .filter(line -> !line.isEmpty())
                 .map(recipeImportService::parseIngredientText)
                 .toList();
