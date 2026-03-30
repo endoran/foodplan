@@ -109,12 +109,12 @@ public class RecipeController {
     }
 
     @PostMapping(value = "/scan", consumes = "multipart/form-data")
-    public ResponseEntity<ImportedRecipePreview> scanImage(
+    public ResponseEntity<ImportedRecipePreview> scanFile(
             @AuthenticationPrincipal Jwt jwt,
-            @RequestParam("image") MultipartFile image) {
+            @RequestParam("file") MultipartFile file) {
         String orgId = jwt.getClaimAsString("orgId");
         try {
-            ImportedRecipePreview preview = recipeScanService.scanImage(orgId, image);
+            ImportedRecipePreview preview = recipeScanService.scanFile(orgId, file);
             return ResponseEntity.ok(preview);
         } catch (RecipeImportException ex) {
             throw ex;

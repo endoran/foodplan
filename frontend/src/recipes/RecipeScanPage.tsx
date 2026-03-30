@@ -40,7 +40,7 @@ export function RecipeScanPage() {
     setPreview(null);
 
     const formData = new FormData();
-    formData.append('image', file);
+    formData.append('file', file);
 
     try {
       const token = localStorage.getItem('token');
@@ -108,10 +108,10 @@ export function RecipeScanPage() {
 
       <form onSubmit={handleScan} className="recipe-form" style={{ marginBottom: '1.5rem' }}>
         <label>
-          Upload photo of recipe card
+          Upload photo or PDF of recipe
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf"
             onChange={e => setFile(e.target.files?.[0] || null)}
             required
           />

@@ -8,13 +8,15 @@ import com.endoran.foodplan.model.StorageCategory;
 import com.endoran.foodplan.repository.IngredientRepository;
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.rendering.PDFRenderer;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -23,8 +25,6 @@ import java.util.regex.Pattern;
 @Service
 public class RecipeScanService {
 
-    private static final Pattern TITLE_PATTERN = Pattern.compile(
-            "^(.+?)\\s*$", Pattern.MULTILINE);
     private static final Pattern SERVINGS_PATTERN = Pattern.compile(
             "(?:serves?|servings?|yield|makes?)\\s*:?\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern TIME_PATTERN = Pattern.compile(
@@ -39,22 +39,63 @@ public class RecipeScanService {
         this.ingredientRepository = ingredientRepository;
     }
 
-    public ImportedRecipePreview scanImage(String orgId, MultipartFile file) {
+    public ImportedRecipePreview scanFile(String orgId, MultipartFile file) {
         String text = performOcr(file);
         return parseScannedText(orgId, text);
     }
 
     String performOcr(MultipartFile file) {
+        String contentType = file.getContentType();
+        if (contentType != null && contentType.equals("application/pdf")) {
+            return ocrPdf(file);
+        }
+        return ocrImage(file);
+    }
+
+    private String ocrImage(MultipartFile file) {
         try {
             BufferedImage image = ImageIO.read(file.getInputStream());
             if (image == null) {
-                throw new RecipeImportException("Could not read image file");
+                throw new RecipeImportException("Could not read image file — supported formats: JPG, PNG, TIFF, BMP");
             }
-            Tesseract tesseract = new Tesseract();
-            tesseract.setLanguage("eng");
-            return tesseract.doOCR(image);
+            return ocrBufferedImage(image);
         } catch (IOException e) {
             throw new RecipeImportException("Failed to read image: " + e.getMessage(), e);
+        }
+    }
+
+    private String ocrPdf(MultipartFile file) {
+        try (PDDocument document = Loader.loadPDF(file.getBytes())) {
+            PDFRenderer renderer = new PDFRenderer(document);
+            int pageCount = document.getNumberOfPages();
+            StringBuilder allText = new StringBuilder();
+
+            for (int i = 0; i < pageCount; i++) {
+                BufferedImage image = renderer.renderImageWithDPI(i, 300);
+                String pageText = ocrBufferedImage(image);
+                if (!pageText.isBlank()) {
+                    allText.append(pageText).append("\n");
+                }
+            }
+
+            if (allText.isEmpty()) {
+                throw new RecipeImportException("No text could be extracted from PDF");
+            }
+            return allText.toString();
+        } catch (IOException e) {
+            throw new RecipeImportException("Failed to read PDF: " + e.getMessage(), e);
+        }
+    }
+
+    private String ocrBufferedImage(BufferedImage image) {
+        try {
+            Tesseract tesseract = new Tesseract();
+            tesseract.setLanguage("eng");
+            String datapath = System.getenv("TESSDATA_PREFIX");
+            if (datapath != null && !datapath.isEmpty()) {
+                tesseract.setDatapath(datapath);
+            }
+            return tesseract.doOCR(image);
         } catch (TesseractException e) {
             throw new RecipeImportException("OCR failed: " + e.getMessage(), e);
         }
@@ -109,10 +150,7 @@ public class RecipeScanService {
             if (inInstructions) {
                 instructionLines.add(line);
             } else {
-                // Heuristic: lines starting with a number or bullet are likely ingredients
-                if (line.matches("^[\\d½¼¾⅓⅔⅛•\\-*].*") || !inInstructions) {
-                    ingredientLines.add(line);
-                }
+                ingredientLines.add(line);
             }
         }
 
@@ -135,7 +173,6 @@ public class RecipeScanService {
         StringBuilder instBuilder = new StringBuilder();
         for (int i = 0; i < instructionLines.size(); i++) {
             String line = instructionLines.get(i);
-            // Number if not already numbered
             if (!line.matches("^\\d+\\..*")) {
                 instBuilder.append(i + 1).append(". ");
             }
