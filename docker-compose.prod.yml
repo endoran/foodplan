@@ -1,0 +1,13 @@
+services:
+  mongo:
+    restart: unless-stopped
+
+  backend:
+    environment:
+      JWT_SECRET: jb993ENmSNHXNHGOBr9N2hGt+1JxSMWn4JivGlHi5vSHChLbAI84mwBcERgzhrKl
+    restart: unless-stopped
+
+  frontend:
+    ports:
+      - "3001:80"
+    restart: unless-stopped

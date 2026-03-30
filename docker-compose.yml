@@ -1,8 +1,6 @@
 services:
   mongo:
     image: mongo:7
-    ports:
-      - "27017:27017"
     volumes:
       - mongo-data:/data/db
     healthcheck:
@@ -14,8 +12,6 @@ services:
 
   backend:
     build: .
-    ports:
-      - "8080:8080"
     environment:
       MONGODB_URI: mongodb://mongo:27017/food
       JWT_SECRET: dGhpcyBpcyBhIGRldiBzZWNyZXQga2V5IHRoYXQgaXMgbG9uZyBlbm91Z2ggZm9yIEhNQUMtU0hBMjU2IHNpZ25pbmc=
@@ -25,8 +21,6 @@ services:
 
   frontend:
     build: ./frontend
-    ports:
-      - "3000:80"
     depends_on:
       - backend
 
