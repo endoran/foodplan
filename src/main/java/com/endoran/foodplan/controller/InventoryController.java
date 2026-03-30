@@ -1,6 +1,7 @@
 package com.endoran.foodplan.controller;
 
 import com.endoran.foodplan.dto.CreateInventoryItemRequest;
+import com.endoran.foodplan.dto.DeductInventoryItemRequest;
 import com.endoran.foodplan.dto.InventoryItemResponse;
 import com.endoran.foodplan.dto.UpdateInventoryItemRequest;
 import com.endoran.foodplan.service.IngredientNotFoundException;
@@ -65,6 +66,15 @@ public class InventoryController {
             @PathVariable String id) {
         String orgId = jwt.getClaimAsString("orgId");
         inventoryService.delete(orgId, id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/deduct")
+    public ResponseEntity<Void> deduct(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody List<DeductInventoryItemRequest> items) {
+        String orgId = jwt.getClaimAsString("orgId");
+        inventoryService.deduct(orgId, items);
         return ResponseEntity.noContent().build();
     }
 

@@ -17,6 +17,7 @@ public class Ingredient {
     private StorageCategory storageCategory;
     private GroceryCategory groceryCategory;
     private Set<DietaryTag> dietaryTags = new HashSet<>();
+    private boolean needsReview;
 
     public String getId() {
         return id;
@@ -64,6 +65,14 @@ public class Ingredient {
 
     public void setDietaryTags(Set<DietaryTag> dietaryTags) {
         this.dietaryTags = dietaryTags;
+    }
+
+    public boolean isNeedsReview() {
+        return needsReview;
+    }
+
+    public void setNeedsReview(boolean needsReview) {
+        this.needsReview = needsReview;
     }
 
     @Override

@@ -32,7 +32,11 @@ export function RecipeListPage() {
     <div className="page">
       <div className="page-header">
         <h1>Recipes</h1>
-        <Link to="/recipes/new" className="btn btn-primary">New Recipe</Link>
+        <div className="btn-group">
+          <Link to="/recipes/scan" className="btn">Scan Card</Link>
+          <Link to="/recipes/import" className="btn">Import URL</Link>
+          <Link to="/recipes/new" className="btn btn-primary">New Recipe</Link>
+        </div>
       </div>
       <form onSubmit={handleSearch} className="search-bar">
         <input

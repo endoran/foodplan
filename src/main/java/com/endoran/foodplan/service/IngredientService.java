@@ -59,6 +59,7 @@ public class IngredientService {
         ingredient.setStorageCategory(request.storageCategory());
         ingredient.setGroceryCategory(request.groceryCategory());
         ingredient.setDietaryTags(request.dietaryTags() != null ? request.dietaryTags() : Collections.emptySet());
+        ingredient.setNeedsReview(false);
         ingredient = ingredientRepository.save(ingredient);
         return toResponse(ingredient);
     }
@@ -83,7 +84,8 @@ public class IngredientService {
                 ingredient.getName(),
                 ingredient.getStorageCategory(),
                 ingredient.getGroceryCategory(),
-                ingredient.getDietaryTags()
+                ingredient.getDietaryTags(),
+                ingredient.isNeedsReview()
         );
     }
 }

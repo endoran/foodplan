@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { apiGet, apiPost } from '../api/client';
+import { apiGet, apiPost, apiPut } from '../api/client';
 import { MealPlanEntry, CalendarView, DropData, CreateMealPlanRequest, MealType } from './types';
 import { RecipeSidebar } from './RecipeSidebar';
 import { WeekView } from './WeekView';
@@ -78,8 +78,24 @@ export function CalendarPage() {
     setCurrentDate(view === 'week' ? getMonday(new Date()) : new Date());
   };
 
-  const handleDrop = (date: Date, data: DropData) => {
-    setPendingDrop({ date, data });
+  const handleDrop = async (date: Date, data: DropData) => {
+    if (data.entryId) {
+      // Move existing meal to new date
+      const entry = entries.find(e => e.id === data.entryId);
+      if (entry) {
+        await apiPut(`/api/v1/meal-plan/${data.entryId}`, {
+          date: formatDate(date),
+          mealType: entry.mealType,
+          recipeId: entry.recipeId,
+          servings: entry.servings,
+          notes: entry.notes,
+        });
+        loadEntries();
+      }
+    } else {
+      // New recipe from sidebar
+      setPendingDrop({ date, data });
+    }
   };
 
   const handleModalConfirm = async (servings: number, mealType: MealType) => {

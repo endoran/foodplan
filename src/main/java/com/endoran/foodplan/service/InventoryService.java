@@ -1,6 +1,7 @@
 package com.endoran.foodplan.service;
 
 import com.endoran.foodplan.dto.CreateInventoryItemRequest;
+import com.endoran.foodplan.dto.DeductInventoryItemRequest;
 import com.endoran.foodplan.dto.InventoryItemResponse;
 import com.endoran.foodplan.dto.UpdateInventoryItemRequest;
 import com.endoran.foodplan.model.Ingredient;
@@ -9,7 +10,9 @@ import com.endoran.foodplan.repository.IngredientRepository;
 import com.endoran.foodplan.repository.InventoryItemRepository;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class InventoryService {
@@ -58,6 +61,24 @@ public class InventoryService {
     public void delete(String orgId, String id) {
         InventoryItem item = findByIdAndOrg(orgId, id);
         inventoryItemRepository.deleteById(item.getId());
+    }
+
+    public void deduct(String orgId, List<DeductInventoryItemRequest> items) {
+        for (DeductInventoryItemRequest req : items) {
+            Optional<InventoryItem> existing = inventoryItemRepository
+                    .findByOrgIdAndIngredientIdAndUnit(orgId, req.ingredientId(), req.unit());
+            if (existing.isPresent()) {
+                InventoryItem item = existing.get();
+                BigDecimal newQty = item.getQuantity().subtract(req.quantity());
+                if (newQty.compareTo(BigDecimal.ZERO) <= 0) {
+                    inventoryItemRepository.deleteById(item.getId());
+                } else {
+                    item.setQuantity(newQty);
+                    inventoryItemRepository.save(item);
+                }
+            }
+            // If no inventory entry exists, silently skip (nothing to deduct from)
+        }
     }
 
     private InventoryItem findByIdAndOrg(String orgId, String id) {

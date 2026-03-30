@@ -28,6 +28,7 @@ export interface Ingredient {
   storageCategory: string;
   groceryCategory: string;
   dietaryTags: string[];
+  needsReview: boolean;
 }
 
 export interface MeasurementUnit {

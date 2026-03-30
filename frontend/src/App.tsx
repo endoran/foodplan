@@ -7,9 +7,14 @@ import { Layout } from './layout/Layout';
 import { RecipeListPage } from './recipes/RecipeListPage';
 import { RecipeDetailPage } from './recipes/RecipeDetailPage';
 import { RecipeFormPage } from './recipes/RecipeFormPage';
+import { IngredientListPage } from './recipes/IngredientListPage';
+import { IngredientFormPage } from './recipes/IngredientFormPage';
+import { RecipeImportPage } from './recipes/RecipeImportPage';
+import { RecipeScanPage } from './recipes/RecipeScanPage';
 import { CalendarPage } from './calendar/CalendarPage';
 import { InventoryPage } from './inventory/InventoryPage';
 import { ShoppingListPage } from './inventory/ShoppingListPage';
+import { QuickCookPage } from './inventory/QuickCookPage';
 
 export function App() {
   return (
@@ -21,11 +26,17 @@ export function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/recipes" element={<ProtectedRoute><RecipeListPage /></ProtectedRoute>} />
             <Route path="/recipes/new" element={<ProtectedRoute><RecipeFormPage /></ProtectedRoute>} />
+            <Route path="/recipes/import" element={<ProtectedRoute><RecipeImportPage /></ProtectedRoute>} />
+            <Route path="/recipes/scan" element={<ProtectedRoute><RecipeScanPage /></ProtectedRoute>} />
             <Route path="/recipes/:id" element={<ProtectedRoute><RecipeDetailPage /></ProtectedRoute>} />
             <Route path="/recipes/:id/edit" element={<ProtectedRoute><RecipeFormPage /></ProtectedRoute>} />
+            <Route path="/ingredients" element={<ProtectedRoute><IngredientListPage /></ProtectedRoute>} />
+            <Route path="/ingredients/new" element={<ProtectedRoute><IngredientFormPage /></ProtectedRoute>} />
+            <Route path="/ingredients/:id/edit" element={<ProtectedRoute><IngredientFormPage /></ProtectedRoute>} />
             <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
             <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
             <Route path="/shopping-list" element={<ProtectedRoute><ShoppingListPage /></ProtectedRoute>} />
+            <Route path="/quick-cook" element={<ProtectedRoute><QuickCookPage /></ProtectedRoute>} />
             <Route path="/" element={<Navigate to="/recipes" replace />} />
           </Route>
         </Routes>

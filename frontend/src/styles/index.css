@@ -98,11 +98,19 @@ body {
 .auth-link { margin-top: 1rem; text-align: center; font-size: 0.875rem; color: var(--muted); }
 .auth-link a { color: var(--primary); }
 
-/* Error */
+/* Error & Success */
 .error {
   background: #fef2f2;
   border: 1px solid #fecaca;
   color: var(--danger);
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+}
+.success {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #16a34a;
   padding: 0.75rem;
   border-radius: var(--radius);
   font-size: 0.875rem;
@@ -150,6 +158,24 @@ body {
 .instructions { white-space: pre-wrap; }
 .muted { color: var(--muted); font-size: 0.875rem; }
 .empty { color: var(--muted); text-align: center; padding: 3rem; }
+
+/* Tag grid (dietary tags checkboxes) */
+.tag-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.tag-checkbox {
+  display: flex; align-items: center; gap: 0.3rem;
+  font-size: 0.85rem; font-weight: 400; cursor: pointer;
+  padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface);
+}
+.tag-checkbox:has(input:checked) { border-color: var(--primary); background: #eff6ff; }
+.tag-checkbox input { margin: 0; }
+
+/* Review badge */
+.review-badge {
+  display: inline-block; margin-left: 0.5rem; font-size: 0.65rem; font-weight: 600;
+  padding: 0.1rem 0.4rem; border-radius: 3px;
+  background: #fef3c7; color: #92400e; text-transform: uppercase;
+}
 
 /* Calendar Layout */
 .calendar-page { display: flex; flex-direction: column; gap: 1rem; }
@@ -208,7 +234,9 @@ body {
 .meal-entry {
   border-radius: 4px; padding: 0.35rem 0.5rem; font-size: 0.8rem;
   border-left: 3px solid var(--border); background: var(--bg);
+  cursor: grab;
 }
+.meal-entry:active { cursor: grabbing; }
 .meal-entry-compact { padding: 0.2rem 0.4rem; font-size: 0.7rem; }
 .meal-entry-header { display: flex; justify-content: space-between; align-items: center; }
 .meal-entry-type { font-size: 0.65rem; text-transform: uppercase; color: var(--muted); font-weight: 600; }

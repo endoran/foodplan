@@ -11,5 +11,6 @@ public record IngredientResponse(
         String name,
         StorageCategory storageCategory,
         GroceryCategory groceryCategory,
-        Set<DietaryTag> dietaryTags
+        Set<DietaryTag> dietaryTags,
+        boolean needsReview
 ) {}

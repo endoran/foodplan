@@ -1,9 +1,14 @@
 package com.endoran.foodplan.controller;
 
 import com.endoran.foodplan.dto.CreateRecipeRequest;
+import com.endoran.foodplan.dto.ImportRecipeRequest;
+import com.endoran.foodplan.dto.ImportedRecipePreview;
 import com.endoran.foodplan.dto.RecipeResponse;
 import com.endoran.foodplan.dto.UpdateRecipeRequest;
+import com.endoran.foodplan.service.RecipeImportException;
+import com.endoran.foodplan.service.RecipeImportService;
 import com.endoran.foodplan.service.RecipeNotFoundException;
+import com.endoran.foodplan.service.RecipeScanService;
 import com.endoran.foodplan.service.RecipeService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -20,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -29,9 +35,14 @@ import java.util.Map;
 public class RecipeController {
 
     private final RecipeService recipeService;
+    private final RecipeImportService recipeImportService;
+    private final RecipeScanService recipeScanService;
 
-    public RecipeController(RecipeService recipeService) {
+    public RecipeController(RecipeService recipeService, RecipeImportService recipeImportService,
+                            RecipeScanService recipeScanService) {
         this.recipeService = recipeService;
+        this.recipeImportService = recipeImportService;
+        this.recipeScanService = recipeScanService;
     }
 
     @PostMapping
@@ -81,6 +92,40 @@ public class RecipeController {
     @ExceptionHandler(RecipeNotFoundException.class)
     public ResponseEntity<Map<String, String>> handleNotFound(RecipeNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", ex.getMessage()));
+    }
+
+    @PostMapping("/import")
+    public ResponseEntity<ImportedRecipePreview> importFromUrl(
+            @Valid @RequestBody ImportRecipeRequest request) {
+        try {
+            ImportedRecipePreview preview = recipeImportService.importFromUrl(request.url());
+            return ResponseEntity.ok(preview);
+        } catch (RecipeImportException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new RecipeImportException("Failed to import recipe: " + ex.getMessage(), ex);
+        }
+    }
+
+    @PostMapping(value = "/scan", consumes = "multipart/form-data")
+    public ResponseEntity<ImportedRecipePreview> scanImage(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam("image") MultipartFile image) {
+        String orgId = jwt.getClaimAsString("orgId");
+        try {
+            ImportedRecipePreview preview = recipeScanService.scanImage(orgId, image);
+            return ResponseEntity.ok(preview);
+        } catch (RecipeImportException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new RecipeImportException("Failed to scan recipe: " + ex.getMessage(), ex);
+        }
+    }
+
+    @ExceptionHandler(RecipeImportException.class)
+    public ResponseEntity<Map<String, String>> handleImportError(RecipeImportException ex) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                 .body(Map.of("error", ex.getMessage()));
     }
 }

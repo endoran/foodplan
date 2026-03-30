@@ -31,4 +31,5 @@ export type CalendarView = 'week' | 'month';
 export interface DropData {
   recipeId: string;
   recipeName: string;
+  entryId?: string; // present = move existing meal, absent = new recipe from sidebar
 }

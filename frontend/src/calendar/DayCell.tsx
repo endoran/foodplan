@@ -24,7 +24,7 @@ export function DayCell({ date, entries, compact, onDrop, onUpdate }: DayCellPro
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
-    setDragOver(true);
+    if (!dragOver) setDragOver(true);
   };
 
   const handleDragLeave = () => setDragOver(false);
