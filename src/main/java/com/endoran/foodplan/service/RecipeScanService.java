@@ -161,9 +161,13 @@ public class RecipeScanService {
             ingredientLines = new ArrayList<>(ingredientLines.subList(0, split));
         }
 
-        // Parse ingredients — strip leading bullets/slashes from OCR artifacts
+        // Parse ingredients — strip leading bullets/slashes from OCR artifacts.
+        // Leading whitespace is trimmed first so "  / item" is caught.
+        // Slashes are only stripped when NOT followed by a digit (to preserve fractions like "1/2").
         List<ImportedIngredientPreview> ingredients = ingredientLines.stream()
-                .map(line -> line.replaceFirst("^[/\\-•*·]+\\s*", ""))
+                .map(String::trim)
+                .map(line -> line.replaceFirst("^[\\-•*·]+\\s*", ""))
+                .map(line -> line.replaceFirst("^/(?!\\d)\\s*", ""))
                 .filter(line -> !line.isEmpty())
                 .map(recipeImportService::parseIngredientText)
                 .toList();

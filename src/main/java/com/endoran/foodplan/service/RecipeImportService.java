@@ -22,7 +22,17 @@ import java.util.regex.Pattern;
 public class RecipeImportService {
 
     private static final Pattern QTY_PATTERN = Pattern.compile(
-            "^\\s*(\\d+(?:[./]\\d+)?)\\s*");
+            "^\\s*(\\d+\\s+\\d+/\\d+|\\d+(?:[./]\\d+)?)\\s*");
+
+    // Unicode fraction characters OCR may produce
+    private static final Map<Character, String> UNICODE_FRACTIONS = Map.ofEntries(
+            Map.entry('\u00BC', "1/4"), Map.entry('\u00BD', "1/2"), Map.entry('\u00BE', "3/4"),
+            Map.entry('\u2153', "1/3"), Map.entry('\u2154', "2/3"),
+            Map.entry('\u2155', "1/5"), Map.entry('\u2156', "2/5"), Map.entry('\u2157', "3/5"),
+            Map.entry('\u2158', "4/5"), Map.entry('\u2159', "1/6"), Map.entry('\u215A', "5/6"),
+            Map.entry('\u215B', "1/8"), Map.entry('\u215C', "3/8"),
+            Map.entry('\u215D', "5/8"), Map.entry('\u215E', "7/8")
+    );
 
     private static final Map<String, String> UNIT_ALIASES = Map.ofEntries(
             Map.entry("teaspoon", "TSP"), Map.entry("teaspoons", "TSP"), Map.entry("tsp", "TSP"),
@@ -45,7 +55,7 @@ public class RecipeImportService {
         String unitAlternation = String.join("|", UNIT_ALIASES.keySet().stream()
                 .sorted((a, b) -> b.length() - a.length()).toList());
         UNIT_PATTERN = Pattern.compile(
-                "^\\s*(?:\\d+(?:[./]\\d+)?\\s*)(" + unitAlternation + ")\\.?\\s+",
+                "^\\s*(?:\\d+\\s+\\d+/\\d+|\\d+(?:[./]\\d+)?)\\s*(" + unitAlternation + ")\\.?\\s+",
                 Pattern.CASE_INSENSITIVE);
     }
 
@@ -145,24 +155,25 @@ public class RecipeImportService {
     }
 
     ImportedIngredientPreview parseIngredientText(String raw) {
+        String normalized = normalizeUnicodeFractions(raw);
         BigDecimal quantity = BigDecimal.ONE;
         String unit = "UNIT";
-        String ingredientName = raw;
+        String ingredientName = normalized;
 
         // Extract quantity
-        Matcher qtyMatcher = QTY_PATTERN.matcher(raw);
+        Matcher qtyMatcher = QTY_PATTERN.matcher(normalized);
         if (qtyMatcher.find()) {
             String qtyStr = qtyMatcher.group(1);
             quantity = parseFraction(qtyStr);
-            ingredientName = raw.substring(qtyMatcher.end()).trim();
+            ingredientName = normalized.substring(qtyMatcher.end()).trim();
         }
 
         // Extract unit
-        Matcher unitMatcher = UNIT_PATTERN.matcher(raw);
+        Matcher unitMatcher = UNIT_PATTERN.matcher(normalized);
         if (unitMatcher.find()) {
             String matchedUnit = unitMatcher.group(1).toLowerCase();
             unit = UNIT_ALIASES.getOrDefault(matchedUnit, "UNIT");
-            ingredientName = raw.substring(unitMatcher.end()).trim();
+            ingredientName = normalized.substring(unitMatcher.end()).trim();
         }
 
         // Clean up ingredient name
@@ -178,6 +189,19 @@ public class RecipeImportService {
     }
 
     private BigDecimal parseFraction(String s) {
+        // Mixed number: "1 1/2" → 1.5
+        if (s.contains(" ") && s.contains("/")) {
+            String[] parts = s.trim().split("\\s+");
+            if (parts.length == 2) {
+                try {
+                    BigDecimal whole = new BigDecimal(parts[0]);
+                    BigDecimal frac = parseFraction(parts[1]);
+                    return whole.add(frac);
+                } catch (Exception e) {
+                    return BigDecimal.ONE;
+                }
+            }
+        }
         if (s.contains("/")) {
             String[] parts = s.split("/");
             if (parts.length == 2) {
@@ -193,5 +217,23 @@ public class RecipeImportService {
         } catch (Exception e) {
             return BigDecimal.ONE;
         }
+    }
+
+    private String normalizeUnicodeFractions(String text) {
+        StringBuilder sb = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            String replacement = UNICODE_FRACTIONS.get(c);
+            if (replacement != null) {
+                // If preceded by a digit (e.g., "1½"), insert a space so it becomes "1 1/2"
+                if (sb.length() > 0 && Character.isDigit(sb.charAt(sb.length() - 1))) {
+                    sb.append(' ');
+                }
+                sb.append(replacement);
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 }
