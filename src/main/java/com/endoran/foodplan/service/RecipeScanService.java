@@ -161,22 +161,49 @@ public class RecipeScanService {
             ingredientLines = new ArrayList<>(ingredientLines.subList(0, split));
         }
 
-        // Parse ingredients
+        // Parse ingredients — strip leading bullets/slashes from OCR artifacts
         List<ImportedIngredientPreview> ingredients = ingredientLines.stream()
+                .map(line -> line.replaceFirst("^[/\\-•*·]+\\s*", ""))
+                .filter(line -> !line.isEmpty())
                 .map(recipeImportService::parseIngredientText)
                 .toList();
 
         // Auto-create unknown ingredients
         autoCreateIngredients(orgId, ingredients);
 
-        // Build instructions text
-        StringBuilder instBuilder = new StringBuilder();
-        for (int i = 0; i < instructionLines.size(); i++) {
-            String line = instructionLines.get(i);
-            if (!line.matches("^\\d+\\..*")) {
-                instBuilder.append(i + 1).append(". ");
+        // Build instructions — merge continuation lines from multi-line OCR steps.
+        // OCR reads document line numbers, so wrapped steps get incrementing numbers.
+        // Heuristic: a new step starts with a number + "." + uppercase letter (sentence start).
+        // A continuation line starts with a number + "." + lowercase (mid-sentence wrap).
+        List<String> mergedInstructions = new ArrayList<>();
+        java.util.regex.Pattern stepPattern = java.util.regex.Pattern.compile("^\\d+\\.\\s*([A-Z].*)");
+        java.util.regex.Pattern numPrefixPattern = java.util.regex.Pattern.compile("^\\d+\\.\\s*(.*)");
+        boolean hasNumberedLines = instructionLines.stream()
+                .anyMatch(l -> numPrefixPattern.matcher(l).matches());
+
+        if (hasNumberedLines) {
+            for (String line : instructionLines) {
+                java.util.regex.Matcher stepMatcher = stepPattern.matcher(line);
+                if (stepMatcher.matches()) {
+                    // New step — starts with number + uppercase
+                    mergedInstructions.add(stepMatcher.group(1));
+                } else if (!mergedInstructions.isEmpty()) {
+                    // Continuation — strip any stray number prefix and append
+                    java.util.regex.Matcher numMatcher = numPrefixPattern.matcher(line);
+                    String content = numMatcher.matches() ? numMatcher.group(1) : line;
+                    int last = mergedInstructions.size() - 1;
+                    mergedInstructions.set(last, mergedInstructions.get(last) + " " + content);
+                } else {
+                    mergedInstructions.add(line);
+                }
             }
-            instBuilder.append(line).append("\n");
+        } else {
+            mergedInstructions.addAll(instructionLines);
+        }
+
+        StringBuilder instBuilder = new StringBuilder();
+        for (int i = 0; i < mergedInstructions.size(); i++) {
+            instBuilder.append(i + 1).append(". ").append(mergedInstructions.get(i)).append("\n");
         }
 
         return new ImportedRecipePreview(title, instBuilder.toString().trim(), servings, ingredients, "scan");
