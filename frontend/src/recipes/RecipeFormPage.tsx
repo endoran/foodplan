@@ -50,8 +50,8 @@ export function RecipeFormPage() {
     })));
   };
 
-  const addRow = () => {
-    setIngredients([...ingredients, { section: '', ingredientId: '', ingredientName: '', quantity: '', unit: 'CUP' }]);
+  const addRow = (section = '') => {
+    setIngredients([...ingredients, { section, ingredientId: '', ingredientName: '', quantity: '', unit: 'CUP' }]);
   };
 
   const removeRow = (index: number) => {
@@ -78,7 +78,7 @@ export function RecipeFormPage() {
       instructions: instructions || null,
       baseServings,
       ingredients: ingredients
-        .filter(row => row.ingredientId && row.quantity)
+        .filter(row => (row.ingredientId || row.ingredientName) && row.quantity)
         .map(row => ({
           section: row.section || null,
           ingredientId: row.ingredientId,
@@ -102,6 +102,14 @@ export function RecipeFormPage() {
       setLoading(false);
     }
   };
+
+  // Group ingredients by section for display
+  const groups: { section: string; startIndex: number }[] = [];
+  ingredients.forEach((ing, i) => {
+    if (i === 0 || ing.section !== ingredients[i - 1].section) {
+      groups.push({ section: ing.section, startIndex: i });
+    }
+  });
 
   return (
     <div className="page">
@@ -127,42 +135,64 @@ export function RecipeFormPage() {
         <div className="section">
           <div className="section-header">
             <h2>Ingredients</h2>
-            <button type="button" onClick={addRow} className="btn btn-small">Add Ingredient</button>
+            <button type="button" onClick={() => addRow()} className="btn btn-small">Add Ingredient</button>
           </div>
-          {ingredients.map((row, i) => (
-            <div key={i} className="ingredient-row">
-              <input
-                type="text"
-                placeholder="Section"
-                value={row.section}
-                onChange={e => updateRow(i, 'section', e.target.value)}
-                style={{ flex: 1 }}
-              />
-              <select
-                value={row.ingredientId}
-                onChange={e => updateRow(i, 'ingredientId', e.target.value)}
-                required
-              >
-                <option value="">Select ingredient...</option>
-                {availableIngredients.map(ing => (
-                  <option key={ing.id} value={ing.id}>{ing.name}</option>
-                ))}
-              </select>
-              <input
-                type="number"
-                placeholder="Qty"
-                value={row.quantity}
-                onChange={e => updateRow(i, 'quantity', e.target.value)}
-                step="0.01"
-                min="0.01"
-                required
-              />
-              <select value={row.unit} onChange={e => updateRow(i, 'unit', e.target.value)}>
-                {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-              </select>
-              <button type="button" onClick={() => removeRow(i)} className="btn btn-danger btn-small">X</button>
-            </div>
-          ))}
+          {groups.map((group, gi) => {
+            const nextStart = gi + 1 < groups.length ? groups[gi + 1].startIndex : ingredients.length;
+            const groupRows = ingredients.slice(group.startIndex, nextStart);
+            return (
+              <div key={gi} style={{ marginBottom: '1rem' }}>
+                {group.section && (
+                  <input
+                    type="text"
+                    value={group.section}
+                    onChange={e => {
+                      const newSection = e.target.value;
+                      const updated = [...ingredients];
+                      for (let j = group.startIndex; j < nextStart; j++) {
+                        updated[j] = { ...updated[j], section: newSection };
+                      }
+                      setIngredients(updated);
+                    }}
+                    style={{ fontWeight: 'bold', fontSize: '1rem', marginBottom: '0.25rem', border: 'none', borderBottom: '1px solid #ccc', background: 'transparent', width: '100%' }}
+                  />
+                )}
+                {groupRows.map((row, j) => {
+                  const i = group.startIndex + j;
+                  // Try to match ingredientId from available list by name
+                  const matchedId = row.ingredientId || availableIngredients.find(
+                    a => a.name.toLowerCase() === row.ingredientName.toLowerCase()
+                  )?.id || '';
+                  return (
+                    <div key={i} className="ingredient-row">
+                      <select
+                        value={matchedId}
+                        onChange={e => updateRow(i, 'ingredientId', e.target.value)}
+                      >
+                        <option value="">{row.ingredientName || 'Select ingredient...'}</option>
+                        {availableIngredients.map(ing => (
+                          <option key={ing.id} value={ing.id}>{ing.name}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        placeholder="Qty"
+                        value={row.quantity}
+                        onChange={e => updateRow(i, 'quantity', e.target.value)}
+                        step="0.01"
+                        min="0.01"
+                        required
+                      />
+                      <select value={row.unit} onChange={e => updateRow(i, 'unit', e.target.value)}>
+                        {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                      <button type="button" onClick={() => removeRow(i)} className="btn btn-danger btn-small">X</button>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
 
         <div className="btn-group">
