@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiGet, apiPost, apiPut } from '../api/client';
+import { formatEnum } from '../utils/formatEnum';
 
-const STORAGE_CATEGORIES = ['DRY', 'FROZEN', 'FRESH', 'REFRIGERATED'];
-const GROCERY_CATEGORIES = ['PRODUCE', 'MEAT', 'DAIRY', 'BAKING', 'SPICES', 'ETHNIC', 'BULK', 'CANNED', 'BAKERY', 'DELI', 'HOUSEHOLD'];
+const STORAGE_CATEGORIES = ['PANTRY', 'FROZEN', 'FRESH', 'REFRIGERATED', 'SPICE_RACK', 'COUNTER'];
+const GROCERY_CATEGORIES = ['PRODUCE', 'MEAT', 'DAIRY', 'BAKING', 'SPICES', 'ETHNIC', 'BULK', 'CANNED', 'BAKERY', 'DELI', 'HOUSEHOLD', 'OILS_CONDIMENTS', 'FROZEN'];
 const DIETARY_TAGS = ['GLUTEN_FREE', 'DAIRY_FREE', 'NUT_FREE', 'VEGAN', 'VEGETARIAN', 'SUGAR_FREE'];
 
 interface IngredientDetail {
@@ -21,7 +22,7 @@ export function IngredientFormPage() {
   const isEdit = !!id;
 
   const [name, setName] = useState('');
-  const [storageCategory, setStorageCategory] = useState('DRY');
+  const [storageCategory, setStorageCategory] = useState('PANTRY');
   const [groceryCategory, setGroceryCategory] = useState('PRODUCE');
   const [dietaryTags, setDietaryTags] = useState<Set<string>>(new Set());
   const [shoppingListExclude, setShoppingListExclude] = useState(false);
@@ -91,7 +92,7 @@ export function IngredientFormPage() {
           Storage Category
           <select value={storageCategory} onChange={e => setStorageCategory(e.target.value)}>
             {STORAGE_CATEGORIES.map(c => (
-              <option key={c} value={c}>{c.charAt(0) + c.slice(1).toLowerCase()}</option>
+              <option key={c} value={c}>{formatEnum(c)}</option>
             ))}
           </select>
         </label>
@@ -100,7 +101,7 @@ export function IngredientFormPage() {
           Grocery Category
           <select value={groceryCategory} onChange={e => setGroceryCategory(e.target.value)}>
             {GROCERY_CATEGORIES.map(c => (
-              <option key={c} value={c}>{c.charAt(0) + c.slice(1).toLowerCase()}</option>
+              <option key={c} value={c}>{formatEnum(c)}</option>
             ))}
           </select>
         </label>

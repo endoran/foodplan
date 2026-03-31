@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiPost } from '../api/client';
+import { formatEnum } from '../utils/formatEnum';
 
 interface ImportedIngredient {
   section: string | null;
@@ -18,7 +19,17 @@ interface ImportedPreview {
   sourceUrl: string;
 }
 
+interface IngredientPreparation {
+  name: string;
+  status: 'EXISTING' | 'NEW';
+  storageCategory: string;
+  groceryCategory: string;
+  shoppingListExclude: boolean;
+}
+
 const UNITS = ['TSP', 'TBSP', 'CUP', 'PINT', 'QUART', 'GALLON', 'HALF_GALLON', 'WHOLE', 'LBS', 'OZ', 'PINCH', 'PIECE'];
+const STORAGE_CATEGORIES = ['PANTRY', 'FROZEN', 'FRESH', 'REFRIGERATED', 'SPICE_RACK', 'COUNTER'];
+const GROCERY_CATEGORIES = ['PRODUCE', 'MEAT', 'DAIRY', 'BAKING', 'SPICES', 'ETHNIC', 'BULK', 'CANNED', 'BAKERY', 'DELI', 'HOUSEHOLD', 'OILS_CONDIMENTS', 'FROZEN'];
 
 export function RecipeScanPage() {
   const navigate = useNavigate();
@@ -33,12 +44,16 @@ export function RecipeScanPage() {
   const [ingredients, setIngredients] = useState<ImportedIngredient[]>([]);
   const [saving, setSaving] = useState(false);
 
+  const [step, setStep] = useState<'edit' | 'review'>('edit');
+  const [newIngredients, setNewIngredients] = useState<IngredientPreparation[]>([]);
+
   const handleScan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return;
     setError('');
     setLoading(true);
     setPreview(null);
+    setStep('edit');
 
     const formData = new FormData();
     formData.append('file', file);
@@ -83,25 +98,65 @@ export function RecipeScanPage() {
     setError('');
     setSaving(true);
     try {
-      const body = {
-        name,
-        instructions: instructions || null,
-        baseServings,
-        ingredients: ingredients.map(ing => ({
-          section: ing.section || null,
-          ingredientId: '',
-          ingredientName: ing.name,
-          quantity: ing.quantity,
-          unit: ing.unit,
-        })),
-      };
-      const created = await apiPost<{ id: string }>('/api/v1/recipes', body);
-      navigate(`/recipes/${created.id}`);
+      const names = ingredients.map(ing => ing.name);
+      const preparations = await apiPost<IngredientPreparation[]>(
+        '/api/v1/ingredients/prepare', { ingredientNames: names });
+      const newOnes = preparations.filter(p => p.status === 'NEW');
+
+      if (newOnes.length > 0) {
+        setNewIngredients(newOnes);
+        setStep('review');
+      } else {
+        await saveRecipe();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setSaving(false);
     }
+  };
+
+  const saveRecipe = async () => {
+    const body = {
+      name,
+      instructions: instructions || null,
+      baseServings,
+      ingredients: ingredients.map(ing => ({
+        section: ing.section || null,
+        ingredientId: '',
+        ingredientName: ing.name,
+        quantity: ing.quantity,
+        unit: ing.unit,
+      })),
+    };
+    const created = await apiPost<{ id: string }>('/api/v1/recipes', body);
+    navigate(`/recipes/${created.id}`);
+  };
+
+  const handleConfirmAndSave = async () => {
+    setError('');
+    setSaving(true);
+    try {
+      await apiPost('/api/v1/ingredients/batch', {
+        ingredients: newIngredients.map(ing => ({
+          name: ing.name,
+          storageCategory: ing.storageCategory,
+          groceryCategory: ing.groceryCategory,
+          shoppingListExclude: ing.shoppingListExclude,
+        })),
+      });
+      await saveRecipe();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateNewIngredient = (index: number, field: keyof IngredientPreparation, value: string | boolean) => {
+    const updated = [...newIngredients];
+    updated[index] = { ...updated[index], [field]: value };
+    setNewIngredients(updated);
   };
 
   return (
@@ -125,7 +180,7 @@ export function RecipeScanPage() {
 
       {error && <div className="error">{error}</div>}
 
-      {preview && (
+      {step === 'edit' && preview && (
         <div className="recipe-form">
           <p className="muted">Scanned text extracted via OCR — review and edit below</p>
 
@@ -153,9 +208,8 @@ export function RecipeScanPage() {
             <div className="section-header">
               <h2>Ingredients (review & edit)</h2>
             </div>
-            <p className="muted">New ingredients will be auto-created when saved.</p>
+            <p className="muted">New ingredients will be reviewed in the next step.</p>
             {(() => {
-              // Group ingredients by section, preserving order
               const groups: { section: string | null; startIndex: number }[] = [];
               ingredients.forEach((ing, i) => {
                 if (i === 0 || ing.section !== ingredients[i - 1].section) {
@@ -223,9 +277,68 @@ export function RecipeScanPage() {
 
           <div className="btn-group">
             <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : 'Save Recipe'}
+              {saving ? 'Checking ingredients...' : 'Save Recipe'}
             </button>
             <button className="btn" onClick={() => { setPreview(null); setFile(null); }}>Discard</button>
+          </div>
+        </div>
+      )}
+
+      {step === 'review' && (
+        <div className="recipe-form">
+          <h2>Review New Ingredients</h2>
+          <p className="muted">These ingredients don't exist yet. Confirm their categories before saving.</p>
+
+          <table className="ingredients-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Storage</th>
+                <th>Grocery Aisle</th>
+                <th>Exclude from List</th>
+              </tr>
+            </thead>
+            <tbody>
+              {newIngredients.map((ing, i) => (
+                <tr key={i}>
+                  <td>{ing.name}</td>
+                  <td>
+                    <select
+                      value={ing.storageCategory}
+                      onChange={e => updateNewIngredient(i, 'storageCategory', e.target.value)}
+                    >
+                      {STORAGE_CATEGORIES.map(c => (
+                        <option key={c} value={c}>{formatEnum(c)}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <select
+                      value={ing.groceryCategory}
+                      onChange={e => updateNewIngredient(i, 'groceryCategory', e.target.value)}
+                    >
+                      {GROCERY_CATEGORIES.map(c => (
+                        <option key={c} value={c}>{formatEnum(c)}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={ing.shoppingListExclude}
+                      onChange={e => updateNewIngredient(i, 'shoppingListExclude', e.target.checked)}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="btn-group">
+            <button className="btn btn-primary" onClick={handleConfirmAndSave} disabled={saving}>
+              {saving ? 'Saving...' : 'Confirm & Save'}
+            </button>
+            <button className="btn" onClick={() => setStep('edit')}>Back</button>
           </div>
         </div>
       )}

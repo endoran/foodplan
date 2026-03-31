@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { apiGet } from '../api/client';
+import { formatEnum } from '../utils/formatEnum';
 import type { ShoppingListResponse } from './types';
 
 function getMonday(d: Date): string {
@@ -19,7 +20,7 @@ function getSunday(d: Date): string {
 }
 
 function formatCategory(cat: string): string {
-  return cat.charAt(0) + cat.slice(1).toLowerCase();
+  return formatEnum(cat);
 }
 
 export function ShoppingListPage() {

@@ -38,7 +38,7 @@ class ReferenceDataControllerTest {
         mockMvc.perform(get("/api/v1/reference/storage-categories"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(StorageCategory.values().length))
-                .andExpect(jsonPath("$[0]").value("DRY"));
+                .andExpect(jsonPath("$[0]").value("PANTRY"));
     }
 
     @Test

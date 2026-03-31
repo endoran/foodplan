@@ -1,6 +1,8 @@
 package com.endoran.foodplan.service;
 
+import com.endoran.foodplan.dto.BatchCreateIngredientsRequest;
 import com.endoran.foodplan.dto.CreateIngredientRequest;
+import com.endoran.foodplan.dto.IngredientPreparation;
 import com.endoran.foodplan.dto.IngredientResponse;
 import com.endoran.foodplan.dto.UpdateIngredientRequest;
 import com.endoran.foodplan.model.DietaryTag;
@@ -69,6 +71,42 @@ public class IngredientService {
     public void delete(String orgId, String id) {
         Ingredient ingredient = findByIdAndOrg(orgId, id);
         ingredientRepository.deleteById(ingredient.getId());
+    }
+
+    public List<IngredientPreparation> prepareIngredients(String orgId, List<String> ingredientNames) {
+        return ingredientNames.stream().map(name -> {
+            var existing = ingredientRepository.findByOrgIdAndNameIgnoreCase(orgId, name);
+            if (existing.isPresent()) {
+                Ingredient ing = existing.get();
+                return new IngredientPreparation(
+                        name, IngredientPreparation.Status.EXISTING,
+                        ing.getStorageCategory(), ing.getGroceryCategory(),
+                        ing.isShoppingListExclude());
+            }
+            IngredientCategoryInference.InferredCategories inferred =
+                    IngredientCategoryInference.infer(name);
+            return new IngredientPreparation(
+                    name, IngredientPreparation.Status.NEW,
+                    inferred.storage(), inferred.grocery(), false);
+        }).toList();
+    }
+
+    public List<IngredientResponse> batchCreate(String orgId, BatchCreateIngredientsRequest request) {
+        return request.ingredients().stream().map(entry -> {
+            // Skip if already exists (race condition guard)
+            var existing = ingredientRepository.findByOrgIdAndNameIgnoreCase(orgId, entry.name());
+            if (existing.isPresent()) {
+                return toResponse(existing.get());
+            }
+            Ingredient ingredient = new Ingredient();
+            ingredient.setOrgId(orgId);
+            ingredient.setName(entry.name());
+            ingredient.setStorageCategory(entry.storageCategory());
+            ingredient.setGroceryCategory(entry.groceryCategory());
+            ingredient.setShoppingListExclude(entry.shoppingListExclude());
+            ingredient = ingredientRepository.save(ingredient);
+            return toResponse(ingredient);
+        }).toList();
     }
 
     private Ingredient findByIdAndOrg(String orgId, String id) {

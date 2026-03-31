@@ -303,7 +303,7 @@ class InventoryFunctionalTest {
 
     private String createIngredient(String token, String name) throws Exception {
         CreateIngredientRequest request = new CreateIngredientRequest(
-                name, StorageCategory.DRY, GroceryCategory.BAKING, Set.of(), false);
+                name, StorageCategory.PANTRY, GroceryCategory.BAKING, Set.of(), false);
         MvcResult result = mockMvc.perform(post("/api/v1/ingredients")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)

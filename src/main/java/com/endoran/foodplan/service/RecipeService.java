@@ -4,12 +4,10 @@ import com.endoran.foodplan.dto.CreateRecipeRequest;
 import com.endoran.foodplan.dto.RecipeIngredientResponse;
 import com.endoran.foodplan.dto.RecipeResponse;
 import com.endoran.foodplan.dto.UpdateRecipeRequest;
-import com.endoran.foodplan.model.GroceryCategory;
 import com.endoran.foodplan.model.Ingredient;
 import com.endoran.foodplan.model.Measurement;
 import com.endoran.foodplan.model.Recipe;
 import com.endoran.foodplan.model.RecipeIngredient;
-import com.endoran.foodplan.model.StorageCategory;
 import com.endoran.foodplan.repository.IngredientRepository;
 import com.endoran.foodplan.repository.RecipeRepository;
 import org.springframework.stereotype.Service;
@@ -132,11 +130,13 @@ public class RecipeService {
             List<Ingredient> existing = ingredientRepository.findByOrgIdAndNameContainingIgnoreCase(
                     orgId, ri.getIngredientName());
             if (existing.isEmpty()) {
+                IngredientCategoryInference.InferredCategories inferred =
+                        IngredientCategoryInference.infer(ri.getIngredientName());
                 Ingredient newIng = new Ingredient();
                 newIng.setOrgId(orgId);
                 newIng.setName(ri.getIngredientName());
-                newIng.setStorageCategory(StorageCategory.DRY);
-                newIng.setGroceryCategory(GroceryCategory.PRODUCE);
+                newIng.setStorageCategory(inferred.storage());
+                newIng.setGroceryCategory(inferred.grocery());
                 newIng.setNeedsReview(true);
                 ingredientRepository.save(newIng);
             }

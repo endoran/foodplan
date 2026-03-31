@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { apiGet, apiDelete } from '../api/client';
+import { formatEnum } from '../utils/formatEnum';
 import type { Ingredient } from './types';
 
 export function IngredientListPage() {
@@ -59,8 +60,8 @@ export function IngredientListPage() {
                 <Link to={`/ingredients/${ing.id}/edit`}>{ing.name}</Link>
                 {ing.needsReview && <span className="review-badge">needs review</span>}
               </td>
-              <td>{ing.groceryCategory}</td>
-              <td>{ing.storageCategory}</td>
+              <td>{formatEnum(ing.groceryCategory)}</td>
+              <td>{formatEnum(ing.storageCategory)}</td>
               <td>{ing.dietaryTags.length > 0 ? ing.dietaryTags.join(', ') : <span className="muted">none</span>}</td>
               <td>
                 <div className="btn-group">

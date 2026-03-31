@@ -1,7 +1,10 @@
 package com.endoran.foodplan.controller;
 
+import com.endoran.foodplan.dto.BatchCreateIngredientsRequest;
 import com.endoran.foodplan.dto.CreateIngredientRequest;
+import com.endoran.foodplan.dto.IngredientPreparation;
 import com.endoran.foodplan.dto.IngredientResponse;
+import com.endoran.foodplan.dto.PrepareIngredientsRequest;
 import com.endoran.foodplan.dto.UpdateIngredientRequest;
 import com.endoran.foodplan.model.DietaryTag;
 import com.endoran.foodplan.model.GroceryCategory;
@@ -43,6 +46,23 @@ public class IngredientController {
         String orgId = jwt.getClaimAsString("orgId");
         IngredientResponse response = ingredientService.create(orgId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/prepare")
+    public ResponseEntity<List<IngredientPreparation>> prepare(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody PrepareIngredientsRequest request) {
+        String orgId = jwt.getClaimAsString("orgId");
+        return ResponseEntity.ok(ingredientService.prepareIngredients(orgId, request.ingredientNames()));
+    }
+
+    @PostMapping("/batch")
+    public ResponseEntity<List<IngredientResponse>> batchCreate(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody BatchCreateIngredientsRequest request) {
+        String orgId = jwt.getClaimAsString("orgId");
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ingredientService.batchCreate(orgId, request));
     }
 
     @GetMapping("/{id}")

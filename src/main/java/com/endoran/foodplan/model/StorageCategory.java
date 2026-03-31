@@ -1,5 +1,5 @@
 package com.endoran.foodplan.model;
 
 public enum StorageCategory {
-     DRY, FROZEN, FRESH, REFRIGERATED
+     PANTRY, FROZEN, FRESH, REFRIGERATED, SPICE_RACK, COUNTER
 }

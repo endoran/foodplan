@@ -1,7 +1,9 @@
 package com.endoran.foodplan.functional;
 
 import com.endoran.foodplan.dto.AuthResponse;
+import com.endoran.foodplan.dto.BatchCreateIngredientsRequest;
 import com.endoran.foodplan.dto.CreateIngredientRequest;
+import com.endoran.foodplan.dto.PrepareIngredientsRequest;
 import com.endoran.foodplan.dto.RegisterRequest;
 import com.endoran.foodplan.dto.UpdateIngredientRequest;
 import com.endoran.foodplan.model.DietaryTag;
@@ -21,6 +23,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.hamcrest.Matchers.*;
@@ -77,7 +80,7 @@ class IngredientFunctionalTest {
     @Test
     void createIngredientWithoutTokenReturns401() throws Exception {
         CreateIngredientRequest request = new CreateIngredientRequest(
-                "Salt", StorageCategory.DRY, GroceryCategory.BAKING, null, false);
+                "Salt", StorageCategory.PANTRY, GroceryCategory.BAKING, null, false);
 
         mockMvc.perform(post("/api/v1/ingredients")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -112,7 +115,7 @@ class IngredientFunctionalTest {
     void getIngredientFromOtherOrgReturns404() throws Exception {
         String tokenA = registerAndGetToken("chefA@example.com", "password123", "Kitchen A");
         String tokenB = registerAndGetToken("chefB@example.com", "password123", "Kitchen B");
-        String id = createIngredient(tokenA, "Secret Spice", StorageCategory.DRY, GroceryCategory.BAKING, null);
+        String id = createIngredient(tokenA, "Secret Spice", StorageCategory.PANTRY, GroceryCategory.BAKING, null);
 
         mockMvc.perform(get("/api/v1/ingredients/" + id)
                         .header("Authorization", "Bearer " + tokenB))
@@ -204,10 +207,10 @@ class IngredientFunctionalTest {
     void updateIngredientFromOtherOrgReturns404() throws Exception {
         String tokenA = registerAndGetToken("chefA@example.com", "password123", "Kitchen A");
         String tokenB = registerAndGetToken("chefB@example.com", "password123", "Kitchen B");
-        String id = createIngredient(tokenA, "Secret Spice", StorageCategory.DRY, GroceryCategory.BAKING, null);
+        String id = createIngredient(tokenA, "Secret Spice", StorageCategory.PANTRY, GroceryCategory.BAKING, null);
 
         UpdateIngredientRequest update = new UpdateIngredientRequest(
-                "Stolen Spice", StorageCategory.DRY, GroceryCategory.BAKING, null, false);
+                "Stolen Spice", StorageCategory.PANTRY, GroceryCategory.BAKING, null, false);
 
         mockMvc.perform(put("/api/v1/ingredients/" + id)
                         .header("Authorization", "Bearer " + tokenB)
@@ -234,7 +237,7 @@ class IngredientFunctionalTest {
     void deleteIngredientFromOtherOrgReturns404() throws Exception {
         String tokenA = registerAndGetToken("chefA@example.com", "password123", "Kitchen A");
         String tokenB = registerAndGetToken("chefB@example.com", "password123", "Kitchen B");
-        String id = createIngredient(tokenA, "Secret Spice", StorageCategory.DRY, GroceryCategory.BAKING, null);
+        String id = createIngredient(tokenA, "Secret Spice", StorageCategory.PANTRY, GroceryCategory.BAKING, null);
 
         mockMvc.perform(delete("/api/v1/ingredients/" + id)
                         .header("Authorization", "Bearer " + tokenB))
@@ -259,12 +262,93 @@ class IngredientFunctionalTest {
     @Test
     void createIngredientWithNullDietaryTagsDefaultsToEmpty() throws Exception {
         String token = registerAndGetToken("chef@example.com", "password123", "Test Kitchen");
-        String id = createIngredient(token, "Salt", StorageCategory.DRY, GroceryCategory.BAKING, null);
+        String id = createIngredient(token, "Salt", StorageCategory.PANTRY, GroceryCategory.BAKING, null);
 
         mockMvc.perform(get("/api/v1/ingredients/" + id)
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.dietaryTags", hasSize(0)));
+    }
+
+    @Test
+    void prepareIngredientsReturnsExistingAndNew() throws Exception {
+        String token = registerAndGetToken("chef@example.com", "password123", "Test Kitchen");
+        createIngredient(token, "Cheddar Cheese", StorageCategory.REFRIGERATED, GroceryCategory.DAIRY, null);
+
+        PrepareIngredientsRequest request = new PrepareIngredientsRequest(
+                List.of("Cheddar Cheese", "Chicken Breast"));
+
+        mockMvc.perform(post("/api/v1/ingredients/prepare")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].name").value("Cheddar Cheese"))
+                .andExpect(jsonPath("$[0].status").value("EXISTING"))
+                .andExpect(jsonPath("$[0].storageCategory").value("REFRIGERATED"))
+                .andExpect(jsonPath("$[0].groceryCategory").value("DAIRY"))
+                .andExpect(jsonPath("$[1].name").value("Chicken Breast"))
+                .andExpect(jsonPath("$[1].status").value("NEW"))
+                .andExpect(jsonPath("$[1].storageCategory").value("REFRIGERATED"))
+                .andExpect(jsonPath("$[1].groceryCategory").value("MEAT"));
+    }
+
+    @Test
+    void prepareIngredientsWithoutTokenReturns401() throws Exception {
+        PrepareIngredientsRequest request = new PrepareIngredientsRequest(List.of("Salt"));
+
+        mockMvc.perform(post("/api/v1/ingredients/prepare")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void batchCreateReturns201() throws Exception {
+        String token = registerAndGetToken("chef@example.com", "password123", "Test Kitchen");
+
+        BatchCreateIngredientsRequest request = new BatchCreateIngredientsRequest(List.of(
+                new BatchCreateIngredientsRequest.Entry("Olive Oil", StorageCategory.PANTRY, GroceryCategory.OILS_CONDIMENTS, false),
+                new BatchCreateIngredientsRequest.Entry("Frozen Peas", StorageCategory.FROZEN, GroceryCategory.FROZEN, false)
+        ));
+
+        mockMvc.perform(post("/api/v1/ingredients/batch")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].name").value("Olive Oil"))
+                .andExpect(jsonPath("$[0].storageCategory").value("PANTRY"))
+                .andExpect(jsonPath("$[0].groceryCategory").value("OILS_CONDIMENTS"))
+                .andExpect(jsonPath("$[1].name").value("Frozen Peas"))
+                .andExpect(jsonPath("$[1].storageCategory").value("FROZEN"))
+                .andExpect(jsonPath("$[1].groceryCategory").value("FROZEN"));
+    }
+
+    @Test
+    void batchCreateSkipsExistingIngredients() throws Exception {
+        String token = registerAndGetToken("chef@example.com", "password123", "Test Kitchen");
+        createIngredient(token, "Olive Oil", StorageCategory.PANTRY, GroceryCategory.OILS_CONDIMENTS, null);
+
+        BatchCreateIngredientsRequest request = new BatchCreateIngredientsRequest(List.of(
+                new BatchCreateIngredientsRequest.Entry("Olive Oil", StorageCategory.PANTRY, GroceryCategory.OILS_CONDIMENTS, false),
+                new BatchCreateIngredientsRequest.Entry("Frozen Peas", StorageCategory.FROZEN, GroceryCategory.FROZEN, false)
+        ));
+
+        mockMvc.perform(post("/api/v1/ingredients/batch")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.length()").value(2));
+
+        // Should still only have 2 ingredients total, not 3
+        mockMvc.perform(get("/api/v1/ingredients")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
     }
 
     // -- helpers --
