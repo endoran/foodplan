@@ -13,8 +13,10 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -123,9 +125,11 @@ public class RecipeScanService {
         }
 
         // Split into ingredients section and instructions
-        List<String> ingredientLines = new ArrayList<>();
+        // Ingredients are stored as (section, line) pairs to preserve sub-recipe grouping
+        List<Map.Entry<String, String>> ingredientEntries = new ArrayList<>();
         List<String> instructionLines = new ArrayList<>();
         boolean inInstructions = false;
+        String currentSection = null;
 
         for (int i = 1; i < nonEmpty.size(); i++) {
             String line = nonEmpty.get(i);
@@ -146,15 +150,17 @@ public class RecipeScanService {
                 continue;
             }
 
-            // Skip sub-recipe section headers
+            // Detect sub-recipe section headers (only in ingredients)
             if (!inInstructions) {
                 // Lines with colon: "For the Marinade:", "Sauce:"
                 if (SUB_SECTION_WITH_COLON.matcher(line).matches()) {
+                    currentSection = cleanSectionName(line);
                     continue;
                 }
                 // Short all-letter lines (≤4 words) without digits: "Soup", "Chicken Rub"
                 if (SUB_SECTION_SHORT_LABEL.matcher(line).matches()
                         && line.split("\\s+").length <= 4) {
+                    currentSection = cleanSectionName(line);
                     continue;
                 }
             }
@@ -169,26 +175,33 @@ public class RecipeScanService {
                 }
                 instructionLines.add(line);
             } else {
-                ingredientLines.add(line);
+                ingredientEntries.add(new AbstractMap.SimpleEntry<>(currentSection, line));
             }
         }
 
         // If we never found an "Instructions" header, assume second half is instructions
-        if (instructionLines.isEmpty() && ingredientLines.size() > 3) {
-            int split = ingredientLines.size() / 2;
-            instructionLines = new ArrayList<>(ingredientLines.subList(split, ingredientLines.size()));
-            ingredientLines = new ArrayList<>(ingredientLines.subList(0, split));
+        if (instructionLines.isEmpty() && ingredientEntries.size() > 3) {
+            int split = ingredientEntries.size() / 2;
+            for (int i = split; i < ingredientEntries.size(); i++) {
+                instructionLines.add(ingredientEntries.get(i).getValue());
+            }
+            ingredientEntries = new ArrayList<>(ingredientEntries.subList(0, split));
         }
 
         // Parse ingredients — strip leading OCR artifacts (bullets, slashes, dashes, etc.).
         // Trim whitespace, then strip any leading non-alphanumeric junk until we hit a
         // letter or digit (the start of a quantity or ingredient name).
-        List<ImportedIngredientPreview> ingredients = ingredientLines.stream()
-                .map(String::trim)
-                .map(line -> line.replaceFirst("^[^\\p{L}\\p{N}]+", ""))
-                .map(String::trim)
-                .filter(line -> !line.isEmpty())
-                .map(recipeImportService::parseIngredientText)
+        List<ImportedIngredientPreview> ingredients = ingredientEntries.stream()
+                .filter(entry -> {
+                    String cleaned = entry.getValue().trim().replaceFirst("^[^\\p{L}\\p{N}]+", "").trim();
+                    return !cleaned.isEmpty();
+                })
+                .map(entry -> {
+                    String section = entry.getKey();
+                    String line = entry.getValue().trim().replaceFirst("^[^\\p{L}\\p{N}]+", "").trim();
+                    ImportedIngredientPreview parsed = recipeImportService.parseIngredientText(line);
+                    return new ImportedIngredientPreview(section, parsed.name(), parsed.quantity(), parsed.unit(), parsed.rawText());
+                })
                 .toList();
 
         // Build instructions — merge continuation lines from multi-line OCR steps.
@@ -300,6 +313,14 @@ public class RecipeScanService {
         }
 
         return new ImportedRecipePreview(title, instBuilder.toString().trim(), servings, ingredients, "scan");
+    }
+
+    private static String cleanSectionName(String header) {
+        return header
+                .replaceFirst(":$", "")
+                .replaceFirst("(?i)^for\\s+the\\s+", "")
+                .replaceFirst("(?i)^for\\s+", "")
+                .trim();
     }
 
 }

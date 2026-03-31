@@ -8,7 +8,8 @@ import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 
 public record RecipeIngredientRequest(
-        @NotBlank String ingredientId,
+        String section,
+        String ingredientId,
         @NotBlank String ingredientName,
         @NotNull @Positive BigDecimal quantity,
         @NotNull MeasurementUnit unit

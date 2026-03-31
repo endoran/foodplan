@@ -73,20 +73,38 @@ export function RecipeDetailPage() {
         {recipe.ingredients.length === 0 ? (
           <p className="muted">No ingredients added.</p>
         ) : (
-          <table className="ingredients-table">
-            <thead>
-              <tr><th>Ingredient</th><th>Quantity</th><th>Unit</th></tr>
-            </thead>
-            <tbody>
-              {recipe.ingredients.map((ing, i) => (
-                <tr key={i}>
-                  <td>{ing.ingredientName}</td>
-                  <td>{ing.quantity}</td>
-                  <td>{ing.unit}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          (() => {
+            // Group ingredients by section, preserving order
+            const groups: { section: string | null; items: typeof recipe.ingredients }[] = [];
+            recipe.ingredients.forEach((ing) => {
+              const last = groups[groups.length - 1];
+              if (last && last.section === (ing.section ?? null)) {
+                last.items.push(ing);
+              } else {
+                groups.push({ section: ing.section ?? null, items: [ing] });
+              }
+            });
+
+            return groups.map((group, gi) => (
+              <div key={gi}>
+                {group.section && <h3>{group.section}</h3>}
+                <table className="ingredients-table">
+                  <thead>
+                    <tr><th>Ingredient</th><th>Quantity</th><th>Unit</th></tr>
+                  </thead>
+                  <tbody>
+                    {group.items.map((ing, i) => (
+                      <tr key={i}>
+                        <td>{ing.ingredientName}</td>
+                        <td>{ing.quantity}</td>
+                        <td>{ing.unit}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ));
+          })()
         )}
       </div>
 

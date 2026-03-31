@@ -4,6 +4,7 @@ import { apiGet, apiPost, apiPut } from '../api/client';
 import type { Recipe, Ingredient } from './types';
 
 interface IngredientRow {
+  section: string;
   ingredientId: string;
   ingredientName: string;
   quantity: string;
@@ -41,6 +42,7 @@ export function RecipeFormPage() {
     setInstructions(recipe.instructions || '');
     setBaseServings(recipe.baseServings);
     setIngredients(recipe.ingredients.map(ing => ({
+      section: ing.section || '',
       ingredientId: ing.ingredientId,
       ingredientName: ing.ingredientName,
       quantity: String(ing.quantity),
@@ -49,7 +51,7 @@ export function RecipeFormPage() {
   };
 
   const addRow = () => {
-    setIngredients([...ingredients, { ingredientId: '', ingredientName: '', quantity: '', unit: 'CUP' }]);
+    setIngredients([...ingredients, { section: '', ingredientId: '', ingredientName: '', quantity: '', unit: 'CUP' }]);
   };
 
   const removeRow = (index: number) => {
@@ -78,6 +80,7 @@ export function RecipeFormPage() {
       ingredients: ingredients
         .filter(row => row.ingredientId && row.quantity)
         .map(row => ({
+          section: row.section || null,
           ingredientId: row.ingredientId,
           ingredientName: row.ingredientName,
           quantity: parseFloat(row.quantity),
@@ -128,6 +131,13 @@ export function RecipeFormPage() {
           </div>
           {ingredients.map((row, i) => (
             <div key={i} className="ingredient-row">
+              <input
+                type="text"
+                placeholder="Section"
+                value={row.section}
+                onChange={e => updateRow(i, 'section', e.target.value)}
+                style={{ flex: 1 }}
+              />
               <select
                 value={row.ingredientId}
                 onChange={e => updateRow(i, 'ingredientId', e.target.value)}

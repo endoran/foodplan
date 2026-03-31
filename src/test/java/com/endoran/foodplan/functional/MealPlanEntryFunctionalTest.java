@@ -336,7 +336,7 @@ class MealPlanEntryFunctionalTest {
 
     private String createRecipeWithIngredient(String token, String recipeName, int baseServings,
                                                String ingredientId, String ingredientName) throws Exception {
-        RecipeIngredientRequest ri = new RecipeIngredientRequest(
+        RecipeIngredientRequest ri = new RecipeIngredientRequest(null,
                 ingredientId, ingredientName, BigDecimal.ONE, MeasurementUnit.CUP);
         CreateRecipeRequest request = new CreateRecipeRequest(recipeName, "instructions", baseServings, List.of(ri));
         MvcResult result = mockMvc.perform(post("/api/v1/recipes")

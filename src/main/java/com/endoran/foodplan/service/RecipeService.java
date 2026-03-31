@@ -87,6 +87,7 @@ public class RecipeService {
         }
         return requests.stream()
                 .map(r -> new RecipeIngredient(
+                        r.section(),
                         r.ingredientId(),
                         r.ingredientName(),
                         new Measurement(r.quantity(), r.unit())))
@@ -118,6 +119,7 @@ public class RecipeService {
                 .multiply(scaleFactor)
                 .setScale(2, RoundingMode.HALF_UP);
         return new RecipeIngredientResponse(
+                ri.getSection(),
                 ri.getIngredientId(),
                 ri.getIngredientName(),
                 scaledQuantity,

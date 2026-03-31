@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiPost } from '../api/client';
 
 interface ImportedIngredient {
+  section: string | null;
   name: string;
   quantity: number;
   unit: string;
@@ -87,6 +88,7 @@ export function RecipeScanPage() {
         instructions: instructions || null,
         baseServings,
         ingredients: ingredients.map(ing => ({
+          section: ing.section || null,
           ingredientId: '',
           ingredientName: ing.name,
           quantity: ing.quantity,
@@ -151,34 +153,71 @@ export function RecipeScanPage() {
             <div className="section-header">
               <h2>Ingredients (review & edit)</h2>
             </div>
-            <p className="muted">New ingredients were auto-created and flagged for review in the Ingredients page.</p>
-            {ingredients.map((ing, i) => (
-              <div key={i} className="ingredient-row">
-                <input
-                  type="text"
-                  value={ing.name}
-                  onChange={e => updateIngredient(i, 'name', e.target.value)}
-                  style={{ flex: 2 }}
-                  placeholder="Ingredient name"
-                />
-                <input
-                  type="number"
-                  value={ing.quantity}
-                  onChange={e => updateIngredient(i, 'quantity', parseFloat(e.target.value) || 0)}
-                  step="0.01"
-                  min="0"
-                  style={{ flex: 1 }}
-                />
-                <select
-                  value={ing.unit}
-                  onChange={e => updateIngredient(i, 'unit', e.target.value)}
-                  style={{ flex: 1 }}
-                >
-                  {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                </select>
-                <button type="button" className="btn btn-danger btn-small" onClick={() => removeIngredient(i)}>X</button>
-              </div>
-            ))}
+            <p className="muted">New ingredients will be auto-created when saved.</p>
+            {(() => {
+              // Group ingredients by section, preserving order
+              const groups: { section: string | null; startIndex: number }[] = [];
+              ingredients.forEach((ing, i) => {
+                if (i === 0 || ing.section !== ingredients[i - 1].section) {
+                  groups.push({ section: ing.section, startIndex: i });
+                }
+              });
+
+              return groups.map((group, gi) => {
+                const nextStart = gi + 1 < groups.length ? groups[gi + 1].startIndex : ingredients.length;
+                const groupIngs = ingredients.slice(group.startIndex, nextStart);
+                return (
+                  <div key={gi} style={{ marginBottom: '1rem' }}>
+                    {group.section && (
+                      <input
+                        type="text"
+                        value={group.section}
+                        onChange={e => {
+                          const newSection = e.target.value;
+                          const updated = [...ingredients];
+                          for (let j = group.startIndex; j < nextStart; j++) {
+                            updated[j] = { ...updated[j], section: newSection };
+                          }
+                          setIngredients(updated);
+                        }}
+                        className="section-label-input"
+                        style={{ fontWeight: 'bold', fontSize: '1rem', marginBottom: '0.25rem', border: 'none', borderBottom: '1px solid #ccc', background: 'transparent', width: '100%' }}
+                      />
+                    )}
+                    {groupIngs.map((ing, j) => {
+                      const i = group.startIndex + j;
+                      return (
+                        <div key={i} className="ingredient-row">
+                          <input
+                            type="text"
+                            value={ing.name}
+                            onChange={e => updateIngredient(i, 'name', e.target.value)}
+                            style={{ flex: 2 }}
+                            placeholder="Ingredient name"
+                          />
+                          <input
+                            type="number"
+                            value={ing.quantity}
+                            onChange={e => updateIngredient(i, 'quantity', parseFloat(e.target.value) || 0)}
+                            step="0.01"
+                            min="0"
+                            style={{ flex: 1 }}
+                          />
+                          <select
+                            value={ing.unit}
+                            onChange={e => updateIngredient(i, 'unit', e.target.value)}
+                            style={{ flex: 1 }}
+                          >
+                            {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                          </select>
+                          <button type="button" className="btn btn-danger btn-small" onClick={() => removeIngredient(i)}>X</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              });
+            })()}
             {ingredients.length === 0 && <p className="muted">No ingredients parsed from scan</p>}
           </div>
 

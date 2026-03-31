@@ -143,9 +143,19 @@ class RecipeScanServiceTest {
         System.out.println("\nIngredients (" + preview.ingredients().size() + "):");
         for (int i = 0; i < preview.ingredients().size(); i++) {
             ImportedIngredientPreview ing = preview.ingredients().get(i);
-            System.out.printf("  %2d. qty=%-8s unit=%-6s name=%-30s raw=%s%n",
-                    i + 1, ing.quantity(), ing.unit(), ing.name(), ing.rawText());
+            System.out.printf("  %2d. [%-13s] qty=%-8s unit=%-6s name=%-30s raw=%s%n",
+                    i + 1, ing.section() == null ? "(none)" : ing.section(),
+                    ing.quantity(), ing.unit(), ing.name(), ing.rawText());
         }
         System.out.println("\nInstructions:\n" + preview.instructions());
+
+        // Verify section assignment
+        for (int i = 0; i < preview.ingredients().size(); i++) {
+            ImportedIngredientPreview ing = preview.ingredients().get(i);
+            String expectedSection = i < 16 ? "Soup" : "Chicken Rub";
+            assert expectedSection.equals(ing.section())
+                    : "Ingredient " + (i + 1) + " (" + ing.name() + ") expected section '"
+                    + expectedSection + "' but got '" + ing.section() + "'";
+        }
     }
 }

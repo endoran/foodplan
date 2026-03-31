@@ -226,7 +226,7 @@ public class RecipeImportService {
             ingredientName = raw;
         }
 
-        return new ImportedIngredientPreview(ingredientName, quantity, unit, raw);
+        return new ImportedIngredientPreview(null, ingredientName, quantity, unit, raw);
     }
 
     private BigDecimal parseFraction(String s) {

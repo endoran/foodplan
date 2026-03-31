@@ -215,8 +215,8 @@ class RecipeFunctionalTest {
         CreateRecipeRequest request = new CreateRecipeRequest("Beef Tacos",
                 "Brown the beef. Assemble.", 4,
                 List.of(
-                        new RecipeIngredientRequest("ing1", "Ground Beef", new BigDecimal("1"), MeasurementUnit.LBS),
-                        new RecipeIngredientRequest("ing2", "Cheddar Cheese", new BigDecimal("2"), MeasurementUnit.CUP)
+                        new RecipeIngredientRequest(null,"ing1", "Ground Beef", new BigDecimal("1"), MeasurementUnit.LBS),
+                        new RecipeIngredientRequest(null,"ing2", "Cheddar Cheese", new BigDecimal("2"), MeasurementUnit.CUP)
                 ));
 
         mockMvc.perform(post("/api/v1/recipes")
@@ -254,6 +254,31 @@ class RecipeFunctionalTest {
     }
 
     @Test
+    void createRecipeFromScanPreview() throws Exception {
+        // Mimics the exact JSON the scan page sends: empty ingredientId, section set
+        String token = registerAndGetToken("chef@example.com", "password123", "Test Kitchen");
+        String json = """
+                {
+                  "name": "Butter Chicken Soup",
+                  "instructions": "1. Cook.",
+                  "baseServings": 1,
+                  "ingredients": [
+                    {"section": "Soup", "ingredientId": "", "ingredientName": "Chicken", "quantity": 4, "unit": "LBS"},
+                    {"section": "Rub", "ingredientId": "", "ingredientName": "Garam Masala", "quantity": 2, "unit": "TBSP"}
+                  ]
+                }
+                """;
+        mockMvc.perform(post("/api/v1/recipes")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.ingredients[0].section").value("Soup"))
+                .andExpect(jsonPath("$.ingredients[0].ingredientName").value("Chicken"))
+                .andExpect(jsonPath("$.ingredients[1].section").value("Rub"));
+    }
+
+    @Test
     void getRecipeByIdReturns200() throws Exception {
         String token = registerAndGetToken("chef@example.com", "password123", "Test Kitchen");
         String id = createRecipeViaApi(token, "Beef Tacos", 4);
@@ -282,7 +307,7 @@ class RecipeFunctionalTest {
         String token = registerAndGetToken("chef@example.com", "password123", "Test Kitchen");
 
         CreateRecipeRequest request = new CreateRecipeRequest("Tacos", "Cook.", 4,
-                List.of(new RecipeIngredientRequest("ing1", "Cheese", new BigDecimal("2"), MeasurementUnit.CUP)));
+                List.of(new RecipeIngredientRequest(null,"ing1", "Cheese", new BigDecimal("2"), MeasurementUnit.CUP)));
         MvcResult result = mockMvc.perform(post("/api/v1/recipes")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -306,7 +331,7 @@ class RecipeFunctionalTest {
         String token = registerAndGetToken("chef@example.com", "password123", "Test Kitchen");
 
         CreateRecipeRequest request = new CreateRecipeRequest("Soup", "Simmer.", 3,
-                List.of(new RecipeIngredientRequest("ing1", "Broth", new BigDecimal("1"), MeasurementUnit.QUART)));
+                List.of(new RecipeIngredientRequest(null,"ing1", "Broth", new BigDecimal("1"), MeasurementUnit.QUART)));
         MvcResult result = mockMvc.perform(post("/api/v1/recipes")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -329,7 +354,7 @@ class RecipeFunctionalTest {
         String token = registerAndGetToken("chef@example.com", "password123", "Test Kitchen");
 
         CreateRecipeRequest request = new CreateRecipeRequest("Tacos", "Cook.", 4,
-                List.of(new RecipeIngredientRequest("ing1", "Cheese", new BigDecimal("2"), MeasurementUnit.CUP)));
+                List.of(new RecipeIngredientRequest(null,"ing1", "Cheese", new BigDecimal("2"), MeasurementUnit.CUP)));
         MvcResult result = mockMvc.perform(post("/api/v1/recipes")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -385,7 +410,7 @@ class RecipeFunctionalTest {
         String id = createRecipeViaApi(token, "Taocs", 4);
 
         UpdateRecipeRequest update = new UpdateRecipeRequest("Tacos", "Updated instructions.", 6,
-                List.of(new RecipeIngredientRequest("ing1", "Cheese", new BigDecimal("3"), MeasurementUnit.CUP)));
+                List.of(new RecipeIngredientRequest(null,"ing1", "Cheese", new BigDecimal("3"), MeasurementUnit.CUP)));
 
         mockMvc.perform(put("/api/v1/recipes/" + id)
                         .header("Authorization", "Bearer " + token)
@@ -453,7 +478,7 @@ class RecipeFunctionalTest {
 
     private String createRecipeViaApi(String token, String name, int baseServings) throws Exception {
         CreateRecipeRequest request = new CreateRecipeRequest(name, "Instructions for " + name, baseServings,
-                List.of(new RecipeIngredientRequest("ing1", "Ingredient", new BigDecimal("1"), MeasurementUnit.CUP)));
+                List.of(new RecipeIngredientRequest(null,"ing1", "Ingredient", new BigDecimal("1"), MeasurementUnit.CUP)));
         MvcResult result = mockMvc.perform(post("/api/v1/recipes")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)

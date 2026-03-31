@@ -190,9 +190,9 @@ class ShoppingListFunctionalTest {
         String flourId = createIngredient(token, "Flour", GroceryCategory.BAKING);
         String chickenId = createIngredient(token, "Chicken", GroceryCategory.MEAT);
 
-        RecipeIngredientRequest ri1 = new RecipeIngredientRequest(flourId, "Flour",
+        RecipeIngredientRequest ri1 = new RecipeIngredientRequest(null,flourId, "Flour",
                 new BigDecimal("2.00"), MeasurementUnit.CUP);
-        RecipeIngredientRequest ri2 = new RecipeIngredientRequest(chickenId, "Chicken",
+        RecipeIngredientRequest ri2 = new RecipeIngredientRequest(null,chickenId, "Chicken",
                 new BigDecimal("1.00"), MeasurementUnit.LBS);
         String recipeId = createRecipeWithIngredients(token, "Fried Chicken", 1, List.of(ri1, ri2));
 
@@ -273,7 +273,7 @@ class ShoppingListFunctionalTest {
     private String createRecipeWithIngredient(String token, String recipeName, int baseServings,
                                                String ingredientId, String ingredientName,
                                                String quantity, MeasurementUnit unit) throws Exception {
-        RecipeIngredientRequest ri = new RecipeIngredientRequest(
+        RecipeIngredientRequest ri = new RecipeIngredientRequest(null,
                 ingredientId, ingredientName, new BigDecimal(quantity), unit);
         CreateRecipeRequest request = new CreateRecipeRequest(recipeName, "instructions", baseServings, List.of(ri));
         MvcResult result = mockMvc.perform(post("/api/v1/recipes")

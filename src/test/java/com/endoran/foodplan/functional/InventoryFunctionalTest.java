@@ -327,7 +327,7 @@ class InventoryFunctionalTest {
     private String createRecipeWithIngredient(String token, String recipeName, int baseServings,
                                                String ingredientId, String ingredientName,
                                                BigDecimal quantity, MeasurementUnit unit) throws Exception {
-        RecipeIngredientRequest ri = new RecipeIngredientRequest(ingredientId, ingredientName, quantity, unit);
+        RecipeIngredientRequest ri = new RecipeIngredientRequest(null,ingredientId, ingredientName, quantity, unit);
         CreateRecipeRequest request = new CreateRecipeRequest(recipeName, "instructions", baseServings, List.of(ri));
         MvcResult result = mockMvc.perform(post("/api/v1/recipes")
                         .header("Authorization", "Bearer " + token)
