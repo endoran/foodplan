@@ -30,6 +30,7 @@ export interface Ingredient {
   groceryCategory: string;
   dietaryTags: string[];
   needsReview: boolean;
+  shoppingListExclude: boolean;
 }
 
 export interface MeasurementUnit {

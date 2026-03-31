@@ -118,7 +118,7 @@ class InventoryFunctionalTest {
     void deleteInventoryItem() throws Exception {
         String token = registerAndGetToken("chef@example.com", "password123", "Test Kitchen");
         String ingredientId = createIngredient(token, "Eggs");
-        String itemId = createInventoryItem(token, ingredientId, "12.00", MeasurementUnit.UNIT);
+        String itemId = createInventoryItem(token, ingredientId, "12.00", MeasurementUnit.WHOLE);
 
         mockMvc.perform(delete("/api/v1/inventory/" + itemId)
                         .header("Authorization", "Bearer " + token))
@@ -303,7 +303,7 @@ class InventoryFunctionalTest {
 
     private String createIngredient(String token, String name) throws Exception {
         CreateIngredientRequest request = new CreateIngredientRequest(
-                name, StorageCategory.DRY, GroceryCategory.BAKING, Set.of());
+                name, StorageCategory.DRY, GroceryCategory.BAKING, Set.of(), false);
         MvcResult result = mockMvc.perform(post("/api/v1/ingredients")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)

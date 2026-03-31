@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { apiGet, apiPost } from '../api/client';
 import type { Ingredient } from '../recipes/types';
 
-const UNITS = ['TSP', 'TBSP', 'CUP', 'PINT', 'QUART', 'GALLON', 'HALF_GALLON', 'UNIT', 'LBS', 'OZ', 'PINCH', 'PIECE'];
+const UNITS = ['TSP', 'TBSP', 'CUP', 'PINT', 'QUART', 'GALLON', 'HALF_GALLON', 'WHOLE', 'LBS', 'OZ', 'PINCH', 'PIECE'];
 
 interface DeductRow {
   ingredientId: string;

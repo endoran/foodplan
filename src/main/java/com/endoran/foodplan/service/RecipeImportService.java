@@ -61,18 +61,18 @@ public class RecipeImportService {
             Map.entry("lbs", "LBS"), Map.entry("1b", "LBS"), Map.entry("1bs", "LBS"),
             Map.entry("ibs", "LBS"), Map.entry("ib", "LBS"),
             // Can
-            Map.entry("can", "UNIT"), Map.entry("cans", "UNIT"),
+            Map.entry("can", "WHOLE"), Map.entry("cans", "WHOLE"),
             // Pinch
             Map.entry("pinch", "PINCH"),
             // Piece
             Map.entry("piece", "PIECE"), Map.entry("pieces", "PIECE"),
             // Descriptive units
-            Map.entry("whole", "UNIT"), Map.entry("large", "UNIT"), Map.entry("medium", "UNIT"),
-            Map.entry("small", "UNIT"), Map.entry("clove", "UNIT"), Map.entry("cloves", "UNIT"),
-            Map.entry("bulb", "UNIT"), Map.entry("bunch", "UNIT"), Map.entry("head", "UNIT"),
-            Map.entry("stalk", "UNIT"), Map.entry("stalks", "UNIT"),
-            Map.entry("sprig", "UNIT"), Map.entry("sprigs", "UNIT"),
-            Map.entry("fresh", "UNIT")
+            Map.entry("whole", "WHOLE"), Map.entry("large", "WHOLE"), Map.entry("medium", "WHOLE"),
+            Map.entry("small", "WHOLE"), Map.entry("clove", "WHOLE"), Map.entry("cloves", "WHOLE"),
+            Map.entry("bulb", "WHOLE"), Map.entry("bunch", "WHOLE"), Map.entry("head", "WHOLE"),
+            Map.entry("stalk", "WHOLE"), Map.entry("stalks", "WHOLE"),
+            Map.entry("sprig", "WHOLE"), Map.entry("sprigs", "WHOLE"),
+            Map.entry("fresh", "WHOLE")
     );
 
     private static final Pattern UNIT_PATTERN;
@@ -183,7 +183,7 @@ public class RecipeImportService {
     ImportedIngredientPreview parseIngredientText(String raw) {
         String normalized = normalizeUnicodeFractions(raw);
         BigDecimal quantity = BigDecimal.ONE;
-        String unit = "UNIT";
+        String unit = "WHOLE";
         String ingredientName = normalized;
 
         // Extract quantity
@@ -198,7 +198,7 @@ public class RecipeImportService {
         Matcher unitMatcher = UNIT_PATTERN.matcher(normalized);
         if (unitMatcher.find()) {
             String matchedUnit = unitMatcher.group(1).toLowerCase();
-            unit = UNIT_ALIASES.getOrDefault(matchedUnit, "UNIT");
+            unit = UNIT_ALIASES.getOrDefault(matchedUnit, "WHOLE");
             ingredientName = normalized.substring(unitMatcher.end()).trim();
         } else if (qtyMatcher.hitEnd() || qtyMatcher.find(0)) {
             // Fuzzy fallback: check if the first word after quantity is close to a known unit

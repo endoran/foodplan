@@ -12,5 +12,6 @@ public record IngredientResponse(
         StorageCategory storageCategory,
         GroceryCategory groceryCategory,
         Set<DietaryTag> dietaryTags,
-        boolean needsReview
+        boolean needsReview,
+        boolean shoppingListExclude
 ) {}

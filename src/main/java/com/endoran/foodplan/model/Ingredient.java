@@ -18,6 +18,7 @@ public class Ingredient {
     private GroceryCategory groceryCategory;
     private Set<DietaryTag> dietaryTags = new HashSet<>();
     private boolean needsReview;
+    private boolean shoppingListExclude;
 
     public String getId() {
         return id;
@@ -73,6 +74,14 @@ public class Ingredient {
 
     public void setNeedsReview(boolean needsReview) {
         this.needsReview = needsReview;
+    }
+
+    public boolean isShoppingListExclude() {
+        return shoppingListExclude;
+    }
+
+    public void setShoppingListExclude(boolean shoppingListExclude) {
+        this.shoppingListExclude = shoppingListExclude;
     }
 
     @Override

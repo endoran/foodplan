@@ -260,7 +260,7 @@ class ShoppingListFunctionalTest {
 
     private String createIngredient(String token, String name, GroceryCategory category) throws Exception {
         CreateIngredientRequest request = new CreateIngredientRequest(
-                name, StorageCategory.DRY, category, Set.of());
+                name, StorageCategory.DRY, category, Set.of(), false);
         MvcResult result = mockMvc.perform(post("/api/v1/ingredients")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)

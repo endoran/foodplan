@@ -13,5 +13,6 @@ public record UpdateIngredientRequest(
         @NotBlank @Size(min = 1, max = 200) String name,
         @NotNull StorageCategory storageCategory,
         @NotNull GroceryCategory groceryCategory,
-        Set<DietaryTag> dietaryTags
+        Set<DietaryTag> dietaryTags,
+        boolean shoppingListExclude
 ) {}

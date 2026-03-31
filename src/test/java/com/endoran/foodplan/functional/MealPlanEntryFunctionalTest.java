@@ -350,7 +350,7 @@ class MealPlanEntryFunctionalTest {
 
     private String createIngredient(String token, String name, Set<DietaryTag> tags) throws Exception {
         CreateIngredientRequest request = new CreateIngredientRequest(
-                name, StorageCategory.REFRIGERATED, GroceryCategory.DAIRY, tags);
+                name, StorageCategory.REFRIGERATED, GroceryCategory.DAIRY, tags, false);
         MvcResult result = mockMvc.perform(post("/api/v1/ingredients")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)

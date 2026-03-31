@@ -11,7 +11,7 @@ interface IngredientRow {
   unit: string;
 }
 
-const UNITS = ['TSP', 'TBSP', 'CUP', 'PINT', 'QUART', 'GALLON', 'HALF_GALLON', 'UNIT', 'LBS', 'OZ', 'PINCH', 'PIECE'];
+const UNITS = ['TSP', 'TBSP', 'CUP', 'PINT', 'QUART', 'GALLON', 'HALF_GALLON', 'WHOLE', 'LBS', 'OZ', 'PINCH', 'PIECE'];
 
 export function RecipeFormPage() {
   const { id } = useParams<{ id: string }>();

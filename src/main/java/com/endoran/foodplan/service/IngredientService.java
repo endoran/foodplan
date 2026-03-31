@@ -30,6 +30,7 @@ public class IngredientService {
         if (request.dietaryTags() != null) {
             ingredient.setDietaryTags(request.dietaryTags());
         }
+        ingredient.setShoppingListExclude(request.shoppingListExclude());
         ingredient = ingredientRepository.save(ingredient);
         return toResponse(ingredient);
     }
@@ -59,6 +60,7 @@ public class IngredientService {
         ingredient.setStorageCategory(request.storageCategory());
         ingredient.setGroceryCategory(request.groceryCategory());
         ingredient.setDietaryTags(request.dietaryTags() != null ? request.dietaryTags() : Collections.emptySet());
+        ingredient.setShoppingListExclude(request.shoppingListExclude());
         ingredient.setNeedsReview(false);
         ingredient = ingredientRepository.save(ingredient);
         return toResponse(ingredient);
@@ -85,7 +87,8 @@ public class IngredientService {
                 ingredient.getStorageCategory(),
                 ingredient.getGroceryCategory(),
                 ingredient.getDietaryTags(),
-                ingredient.isNeedsReview()
+                ingredient.isNeedsReview(),
+                ingredient.isShoppingListExclude()
         );
     }
 }

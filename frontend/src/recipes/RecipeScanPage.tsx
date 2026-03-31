@@ -18,7 +18,7 @@ interface ImportedPreview {
   sourceUrl: string;
 }
 
-const UNITS = ['TSP', 'TBSP', 'CUP', 'PINT', 'QUART', 'GALLON', 'HALF_GALLON', 'UNIT', 'LBS', 'OZ', 'PINCH', 'PIECE'];
+const UNITS = ['TSP', 'TBSP', 'CUP', 'PINT', 'QUART', 'GALLON', 'HALF_GALLON', 'WHOLE', 'LBS', 'OZ', 'PINCH', 'PIECE'];
 
 export function RecipeScanPage() {
   const navigate = useNavigate();

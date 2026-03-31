@@ -46,7 +46,7 @@ class RecipeTest {
 
         RecipeIngredient lettuce = new RecipeIngredient(
                 "ing2", "Lettuce",
-                new Measurement(new BigDecimal("1"), MeasurementUnit.UNIT));
+                new Measurement(new BigDecimal("1"), MeasurementUnit.WHOLE));
 
         r.setIngredients(List.of(cheese, lettuce));
 

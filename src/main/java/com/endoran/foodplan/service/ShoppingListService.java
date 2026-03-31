@@ -81,6 +81,11 @@ public class ShoppingListService {
         ingredientRepository.findAllById(ingredientIds).forEach(i -> ingredientMap.put(i.getId(), i));
 
         for (DemandAccumulator acc : demand.values()) {
+            Ingredient ingredient = ingredientMap.get(acc.ingredientId);
+
+            // Skip ingredients excluded from shopping list (e.g., water)
+            if (ingredient != null && ingredient.isShoppingListExclude()) continue;
+
             BigDecimal needed = acc.getTotal();
 
             // Subtract matching inventory
@@ -111,7 +116,6 @@ public class ShoppingListService {
                 displayQty = readable.getQuantity();
             }
 
-            Ingredient ingredient = ingredientMap.get(acc.ingredientId);
             GroceryCategory category = ingredient != null ? ingredient.getGroceryCategory() : GroceryCategory.HOUSEHOLD;
 
             items.add(new ShoppingItemWithCategory(

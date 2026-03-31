@@ -60,7 +60,7 @@ class IngredientFunctionalTest {
 
         CreateIngredientRequest request = new CreateIngredientRequest(
                 "Cheddar Cheese", StorageCategory.REFRIGERATED, GroceryCategory.DAIRY,
-                Set.of(DietaryTag.VEGETARIAN));
+                Set.of(DietaryTag.VEGETARIAN), false);
 
         mockMvc.perform(post("/api/v1/ingredients")
                         .header("Authorization", "Bearer " + token)
@@ -77,7 +77,7 @@ class IngredientFunctionalTest {
     @Test
     void createIngredientWithoutTokenReturns401() throws Exception {
         CreateIngredientRequest request = new CreateIngredientRequest(
-                "Salt", StorageCategory.DRY, GroceryCategory.BAKING, null);
+                "Salt", StorageCategory.DRY, GroceryCategory.BAKING, null, false);
 
         mockMvc.perform(post("/api/v1/ingredients")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -189,7 +189,7 @@ class IngredientFunctionalTest {
 
         UpdateIngredientRequest update = new UpdateIngredientRequest(
                 "Cheddar Cheese", StorageCategory.REFRIGERATED, GroceryCategory.DAIRY,
-                Set.of(DietaryTag.VEGETARIAN));
+                Set.of(DietaryTag.VEGETARIAN), false);
 
         mockMvc.perform(put("/api/v1/ingredients/" + id)
                         .header("Authorization", "Bearer " + token)
@@ -207,7 +207,7 @@ class IngredientFunctionalTest {
         String id = createIngredient(tokenA, "Secret Spice", StorageCategory.DRY, GroceryCategory.BAKING, null);
 
         UpdateIngredientRequest update = new UpdateIngredientRequest(
-                "Stolen Spice", StorageCategory.DRY, GroceryCategory.BAKING, null);
+                "Stolen Spice", StorageCategory.DRY, GroceryCategory.BAKING, null, false);
 
         mockMvc.perform(put("/api/v1/ingredients/" + id)
                         .header("Authorization", "Bearer " + tokenB)
@@ -284,7 +284,7 @@ class IngredientFunctionalTest {
 
     private String createIngredient(String token, String name, StorageCategory storage,
                                     GroceryCategory grocery, Set<DietaryTag> tags) throws Exception {
-        CreateIngredientRequest request = new CreateIngredientRequest(name, storage, grocery, tags);
+        CreateIngredientRequest request = new CreateIngredientRequest(name, storage, grocery, tags, false);
         MvcResult result = mockMvc.perform(post("/api/v1/ingredients")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)

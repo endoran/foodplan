@@ -12,6 +12,7 @@ interface IngredientDetail {
   storageCategory: string;
   groceryCategory: string;
   dietaryTags: string[];
+  shoppingListExclude: boolean;
 }
 
 export function IngredientFormPage() {
@@ -23,6 +24,7 @@ export function IngredientFormPage() {
   const [storageCategory, setStorageCategory] = useState('DRY');
   const [groceryCategory, setGroceryCategory] = useState('PRODUCE');
   const [dietaryTags, setDietaryTags] = useState<Set<string>>(new Set());
+  const [shoppingListExclude, setShoppingListExclude] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -33,6 +35,7 @@ export function IngredientFormPage() {
         setStorageCategory(ing.storageCategory);
         setGroceryCategory(ing.groceryCategory);
         setDietaryTags(new Set(ing.dietaryTags));
+        setShoppingListExclude(ing.shoppingListExclude);
       });
     }
   }, [id]);
@@ -56,6 +59,7 @@ export function IngredientFormPage() {
       storageCategory,
       groceryCategory,
       dietaryTags: Array.from(dietaryTags),
+      shoppingListExclude,
     };
 
     try {
@@ -116,6 +120,15 @@ export function IngredientFormPage() {
             ))}
           </div>
         </div>
+
+        <label className="tag-checkbox">
+          <input
+            type="checkbox"
+            checked={shoppingListExclude}
+            onChange={e => setShoppingListExclude(e.target.checked)}
+          />
+          Exclude from shopping list
+        </label>
 
         <div className="btn-group">
           <button type="submit" className="btn btn-primary" disabled={loading}>

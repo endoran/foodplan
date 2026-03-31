@@ -3,7 +3,7 @@ import { apiGet, apiPost, apiPut, apiDelete } from '../api/client';
 import type { Ingredient } from '../recipes/types';
 import type { InventoryItem } from './types';
 
-const UNITS = ['TSP', 'TBSP', 'CUP', 'PINT', 'QUART', 'GALLON', 'HALF_GALLON', 'UNIT', 'LBS', 'OZ', 'PINCH', 'PIECE'];
+const UNITS = ['TSP', 'TBSP', 'CUP', 'PINT', 'QUART', 'GALLON', 'HALF_GALLON', 'WHOLE', 'LBS', 'OZ', 'PINCH', 'PIECE'];
 
 export function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
