@@ -74,29 +74,33 @@ export function ShoppingListPage() {
         <p className="empty">No items needed for this period</p>
       )}
 
-      {result && result.aisles.map(aisle => (
-        <div key={aisle.category} className="section">
-          <h2>{formatCategory(aisle.category)}</h2>
-          <table className="ingredients-table">
-            <thead>
-              <tr>
-                <th>Ingredient</th>
-                <th>Quantity</th>
-                <th>Unit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {aisle.items.map(item => (
-                <tr key={item.ingredientId}>
-                  <td>{item.ingredientName}</td>
-                  <td>{Number(item.quantity) % 1 === 0 ? item.quantity : Number(item.quantity).toFixed(2)}</td>
-                  <td>{item.unit}</td>
+      {result && result.aisles.length > 0 && (
+        <table className="ingredients-table">
+          <thead>
+            <tr>
+              <th>Ingredient</th>
+              <th>Quantity</th>
+              <th>Unit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {result.aisles.map(aisle => (
+              <>
+                <tr key={aisle.category + '-header'} className="aisle-header-row">
+                  <td colSpan={3}><strong>{formatCategory(aisle.category)}</strong></td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
+                {aisle.items.map(item => (
+                  <tr key={item.ingredientId}>
+                    <td>{item.ingredientName}</td>
+                    <td>{Number(item.quantity) % 1 === 0 ? item.quantity : Number(item.quantity).toFixed(2)}</td>
+                    <td>{formatEnum(item.unit)}</td>
+                  </tr>
+                ))}
+              </>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
