@@ -1,5 +1,6 @@
 import { MealPlanEntry, DropData } from './types';
 import { apiPost, apiDelete } from '../api/client';
+import { formatEnum } from '../utils/formatEnum';
 
 interface MealEntryProps {
   entry: MealPlanEntry;
@@ -59,11 +60,9 @@ export function MealEntry({ entry, compact, onUpdate }: MealEntryProps) {
       <span className="meal-entry-servings">{entry.servings} serving{entry.servings !== 1 ? 's' : ''}</span>
       {entry.warnings.length > 0 && (
         <div className="dietary-badges">
-          {entry.warnings.map((w, i) => (
-            <span key={i} className="dietary-badge" title={w.ingredientName}>
-              {w.tags.join(', ')}
-            </span>
-          ))}
+          <span className="dietary-badge">
+            {[...new Set(entry.warnings.flatMap(w => w.tags))].map(t => formatEnum(t)).join(', ')}
+          </span>
         </div>
       )}
     </div>
