@@ -61,6 +61,7 @@ public class RecipeService {
         recipe.setInstructions(request.instructions());
         recipe.setBaseServings(request.baseServings());
         recipe.setIngredients(toIngredients(request.ingredients()));
+        autoCreateIngredients(orgId, recipe.getIngredients());
         recipe = recipeRepository.save(recipe);
         return toResponse(recipe, null);
     }
@@ -127,9 +128,14 @@ public class RecipeService {
 
     private void autoCreateIngredients(String orgId, List<RecipeIngredient> ingredients) {
         for (RecipeIngredient ri : ingredients) {
-            List<Ingredient> existing = ingredientRepository.findByOrgIdAndNameContainingIgnoreCase(
+            // Skip if already resolved
+            if (ri.getIngredientId() != null && !ri.getIngredientId().isBlank()) continue;
+
+            var existing = ingredientRepository.findByOrgIdAndNameIgnoreCase(
                     orgId, ri.getIngredientName());
-            if (existing.isEmpty()) {
+            if (existing.isPresent()) {
+                ri.setIngredientId(existing.get().getId());
+            } else {
                 IngredientCategoryInference.InferredCategories inferred =
                         IngredientCategoryInference.infer(ri.getIngredientName());
                 Ingredient newIng = new Ingredient();
@@ -138,7 +144,8 @@ public class RecipeService {
                 newIng.setStorageCategory(inferred.storage());
                 newIng.setGroceryCategory(inferred.grocery());
                 newIng.setNeedsReview(true);
-                ingredientRepository.save(newIng);
+                newIng = ingredientRepository.save(newIng);
+                ri.setIngredientId(newIng.getId());
             }
         }
     }
