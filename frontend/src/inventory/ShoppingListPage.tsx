@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { apiGet } from '../api/client';
 import { formatEnum } from '../utils/formatEnum';
 import type { ShoppingListResponse } from './types';
@@ -31,11 +31,11 @@ export function ShoppingListPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleGenerate = async () => {
+  const generate = async (fromDate: string, toDate: string) => {
     setError('');
     setLoading(true);
     try {
-      const data = await apiGet<ShoppingListResponse>(`/api/v1/shopping-list?from=${from}&to=${to}`);
+      const data = await apiGet<ShoppingListResponse>(`/api/v1/shopping-list?from=${fromDate}&to=${toDate}`);
       setResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate');
@@ -43,6 +43,10 @@ export function ShoppingListPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => { generate(from, to); }, []); // auto-generate on mount
+
+  const handleGenerate = () => generate(from, to);
 
   return (
     <div className="page">

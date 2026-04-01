@@ -1,10 +1,11 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { apiGet, apiPost, apiPut } from '../api/client';
 import { MealPlanEntry, CalendarView, DropData, CreateMealPlanRequest, MealType } from './types';
 import { RecipeSidebar } from './RecipeSidebar';
 import { WeekView } from './WeekView';
 import { MonthView } from './MonthView';
 import { ServingsModal } from './ServingsModal';
+import { ShoppingListSummary } from './ShoppingListSummary';
 
 function getMonday(d: Date): Date {
   const date = new Date(d);
@@ -30,6 +31,7 @@ export function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(() => getMonday(new Date()));
   const [entries, setEntries] = useState<MealPlanEntry[]>([]);
   const [pendingDrop, setPendingDrop] = useState<{ date: Date; data: DropData } | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const getDateRange = useCallback((): { from: string; to: string } => {
     if (view === 'week') {
@@ -49,6 +51,13 @@ export function CalendarPage() {
   }, [getDateRange]);
 
   useEffect(() => { loadEntries(); }, [loadEntries]);
+
+  const handleMealChange = useCallback(() => {
+    loadEntries();
+    setRefreshKey(k => k + 1);
+  }, [loadEntries]);
+
+  const dateRange = useMemo(() => getDateRange(), [getDateRange]);
 
   const handlePrev = () => {
     if (view === 'week') {
@@ -90,7 +99,7 @@ export function CalendarPage() {
           servings: entry.servings,
           notes: entry.notes,
         });
-        loadEntries();
+        handleMealChange();
       }
     } else {
       // New recipe from sidebar
@@ -108,7 +117,7 @@ export function CalendarPage() {
     };
     await apiPost('/api/v1/meal-plan', body);
     setPendingDrop(null);
-    loadEntries();
+    handleMealChange();
   };
 
   const getTitle = (): string => {
@@ -151,7 +160,7 @@ export function CalendarPage() {
               weekStart={currentDate}
               entries={entries}
               onDrop={handleDrop}
-              onUpdate={loadEntries}
+              onUpdate={handleMealChange}
             />
           ) : (
             <MonthView
@@ -159,11 +168,13 @@ export function CalendarPage() {
               month={currentDate.getMonth()}
               entries={entries}
               onDrop={handleDrop}
-              onUpdate={loadEntries}
+              onUpdate={handleMealChange}
             />
           )}
         </div>
       </div>
+
+      <ShoppingListSummary from={dateRange.from} to={dateRange.to} refreshKey={refreshKey} />
 
       {pendingDrop && (
         <ServingsModal
