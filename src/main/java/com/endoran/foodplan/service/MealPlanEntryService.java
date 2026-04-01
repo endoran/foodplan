@@ -141,6 +141,8 @@ public class MealPlanEntryService {
     private List<DietaryWarning> buildDietaryWarnings(Recipe recipe) {
         List<String> ingredientIds = recipe.getIngredients().stream()
                 .map(ri -> ri.getIngredientId())
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
                 .toList();
         if (ingredientIds.isEmpty()) {
             return Collections.emptyList();
