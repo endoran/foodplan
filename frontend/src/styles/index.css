@@ -289,7 +289,7 @@ body {
 .shopping-controls label {
   display: flex; flex-direction: column; gap: 0.25rem; font-weight: 500; font-size: 0.875rem;
 }
-.shopping-controls input[type="date"] {
+.shopping-controls input[type="date"], .shopping-controls select {
   padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.875rem;
 }
 .aisle-header-row td {
@@ -312,6 +312,21 @@ body {
 }
 .shopping-aisle-items { padding-left: 1rem; font-size: 0.85rem; color: var(--text-secondary); list-style: none; }
 .shopping-aisle-items li { padding: 0.1rem 0; }
+
+/* Stock level indicators */
+.stock-high { color: #16a34a; font-weight: 500; }
+.stock-low { color: #ca8a04; font-weight: 500; }
+.stock-out { color: var(--danger); font-weight: 500; }
+
+/* Price display */
+.price-promo { color: #16a34a; font-weight: 600; }
+.price-regular-struck { text-decoration: line-through; color: var(--muted); font-size: 0.8rem; margin-left: 0.25rem; }
+
+/* Shopping total */
+.shopping-total td {
+  padding-top: 1rem; font-weight: 700; font-size: 1.05rem;
+  border-top: 2px solid var(--border);
+}
 
 /* Bulk edit table */
 .bulk-edit-table td { vertical-align: middle; }

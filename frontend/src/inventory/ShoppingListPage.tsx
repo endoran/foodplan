@@ -3,6 +3,12 @@ import { apiGet } from '../api/client';
 import { formatEnum } from '../utils/formatEnum';
 import type { ShoppingListResponse } from './types';
 
+const STORES = [
+  { value: '', label: 'No Store' },
+  { value: 'CHEF_STORE', label: "CHEF'STORE" },
+  { value: 'FRED_MEYER', label: 'Fred Meyer' },
+];
+
 function getMonday(d: Date): string {
   const date = new Date(d);
   const day = date.getDay();
@@ -19,23 +25,30 @@ function getSunday(d: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-function formatCategory(cat: string): string {
-  return formatEnum(cat);
+function formatQty(q: number): string {
+  return q % 1 === 0 ? String(q) : q.toFixed(2);
+}
+
+function formatPrice(p: number | undefined): string {
+  return p != null ? `$${p.toFixed(2)}` : '';
 }
 
 export function ShoppingListPage() {
   const now = new Date();
   const [from, setFrom] = useState(getMonday(now));
   const [to, setTo] = useState(getSunday(now));
+  const [store, setStore] = useState(() => localStorage.getItem('preferredStore') || '');
   const [result, setResult] = useState<ShoppingListResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const generate = async (fromDate: string, toDate: string) => {
+  const generate = async (fromDate: string, toDate: string, storeVal: string) => {
     setError('');
     setLoading(true);
     try {
-      const data = await apiGet<ShoppingListResponse>(`/api/v1/shopping-list?from=${fromDate}&to=${toDate}`);
+      let url = `/api/v1/shopping-list?from=${fromDate}&to=${toDate}`;
+      if (storeVal) url += `&store=${storeVal}`;
+      const data = await apiGet<ShoppingListResponse>(url);
       setResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate');
@@ -44,9 +57,25 @@ export function ShoppingListPage() {
     }
   };
 
-  useEffect(() => { generate(from, to); }, []); // auto-generate on mount
+  useEffect(() => { generate(from, to, store); }, []);
 
-  const handleGenerate = () => generate(from, to);
+  const handleGenerate = () => generate(from, to, store);
+
+  const handleStoreChange = (value: string) => {
+    setStore(value);
+    localStorage.setItem('preferredStore', value);
+    generate(from, to, value);
+  };
+
+  const hasStore = !!result?.storeName;
+  const colCount = hasStore ? 6 : 3;
+
+  const total = hasStore
+    ? result!.aisles.flatMap(a => a.items).reduce((sum, item) => {
+        const price = item.storePromoPrice ?? item.storePrice;
+        return sum + (price ?? 0);
+      }, 0)
+    : 0;
 
   return (
     <div className="page">
@@ -63,12 +92,26 @@ export function ShoppingListPage() {
           To
           <input type="date" value={to} onChange={e => setTo(e.target.value)} />
         </label>
+        <label>
+          Store
+          <select value={store} onChange={e => handleStoreChange(e.target.value)}>
+            {STORES.map(s => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+        </label>
         <button className="btn btn-primary" onClick={handleGenerate} disabled={loading}>
           {loading ? 'Generating...' : 'Generate'}
         </button>
       </div>
 
       {error && <div className="error">{error}</div>}
+
+      {result && hasStore && (
+        <p className="muted" style={{ marginBottom: '0.75rem' }}>
+          Showing prices for <strong>{result.storeName}</strong>
+        </p>
+      )}
 
       {result && result.aisles.length === 0 && (
         <p className="empty">No items needed for this period</p>
@@ -79,26 +122,59 @@ export function ShoppingListPage() {
           <thead>
             <tr>
               <th>Ingredient</th>
+              {hasStore && <th>Aisle</th>}
               <th>Quantity</th>
               <th>Unit</th>
+              {hasStore && <th>Price</th>}
+              {hasStore && <th>Stock</th>}
             </tr>
           </thead>
           <tbody>
             {result.aisles.map(aisle => (
-              <>
-                <tr key={aisle.category + '-header'} className="aisle-header-row">
-                  <td colSpan={3}><strong>{formatCategory(aisle.category)}</strong></td>
+              <tbody key={aisle.category}>
+                <tr className="aisle-header-row">
+                  <td colSpan={colCount}><strong>{formatEnum(aisle.category)}</strong></td>
                 </tr>
                 {aisle.items.map(item => (
-                  <tr key={item.ingredientId}>
+                  <tr key={item.ingredientId} title={item.storeProductName || undefined}>
                     <td>{item.ingredientName}</td>
-                    <td>{Number(item.quantity) % 1 === 0 ? item.quantity : Number(item.quantity).toFixed(2)}</td>
+                    {hasStore && <td>{item.storeAisle || '-'}</td>}
+                    <td>{formatQty(Number(item.quantity))}</td>
                     <td>{formatEnum(item.unit)}</td>
+                    {hasStore && (
+                      <td>
+                        {item.storePromoPrice != null ? (
+                          <>
+                            <span className="price-promo">{formatPrice(item.storePromoPrice)}</span>
+                            <span className="price-regular-struck">{formatPrice(item.storePrice)}</span>
+                          </>
+                        ) : (
+                          formatPrice(item.storePrice) || '-'
+                        )}
+                      </td>
+                    )}
+                    {hasStore && (
+                      <td>
+                        {item.storeStockLevel === 'HIGH' && <span className="stock-high">In Stock</span>}
+                        {item.storeStockLevel === 'LOW' && <span className="stock-low">Low</span>}
+                        {item.storeStockLevel === 'OUT' && <span className="stock-out">Out</span>}
+                        {!item.storeStockLevel && '-'}
+                      </td>
+                    )}
                   </tr>
                 ))}
-              </>
+              </tbody>
             ))}
           </tbody>
+          {hasStore && total > 0 && (
+            <tfoot>
+              <tr className="shopping-total">
+                <td colSpan={4} style={{ textAlign: 'right' }}>Estimated Total</td>
+                <td><strong>{formatPrice(total)}</strong></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       )}
     </div>

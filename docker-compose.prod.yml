@@ -7,6 +7,9 @@ services:
       JWT_SECRET: jb993ENmSNHXNHGOBr9N2hGt+1JxSMWn4JivGlHi5vSHChLbAI84mwBcERgzhrKl
       CORS_ALLOWED_ORIGINS: http://methuselah.local:3001
       SLACK_ERROR_TOKEN: ${SLACK_ERROR_TOKEN:-}
+      KROGER_CLIENT_ID: ${KROGER_CLIENT_ID:-}
+      KROGER_CLIENT_SECRET: ${KROGER_CLIENT_SECRET:-}
+      KROGER_LOCATION_ID: ${KROGER_LOCATION_ID:-}
     restart: unless-stopped
 
   frontend:

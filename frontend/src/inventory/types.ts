@@ -11,6 +11,11 @@ export interface ShoppingItem {
   ingredientName: string;
   quantity: number;
   unit: string;
+  storeAisle?: string;
+  storePrice?: number;
+  storePromoPrice?: number;
+  storeStockLevel?: string;
+  storeProductName?: string;
 }
 
 export interface ShoppingAisle {
@@ -20,4 +25,5 @@ export interface ShoppingAisle {
 
 export interface ShoppingListResponse {
   aisles: ShoppingAisle[];
+  storeName?: string;
 }
