@@ -9,6 +9,7 @@ import { RecipeDetailPage } from './recipes/RecipeDetailPage';
 import { RecipeFormPage } from './recipes/RecipeFormPage';
 import { IngredientListPage } from './recipes/IngredientListPage';
 import { IngredientFormPage } from './recipes/IngredientFormPage';
+import { IngredientBulkEditPage } from './recipes/IngredientBulkEditPage';
 import { RecipeImportPage } from './recipes/RecipeImportPage';
 import { RecipeScanPage } from './recipes/RecipeScanPage';
 import { CalendarPage } from './calendar/CalendarPage';
@@ -31,6 +32,7 @@ export function App() {
             <Route path="/recipes/:id" element={<ProtectedRoute><RecipeDetailPage /></ProtectedRoute>} />
             <Route path="/recipes/:id/edit" element={<ProtectedRoute><RecipeFormPage /></ProtectedRoute>} />
             <Route path="/ingredients" element={<ProtectedRoute><IngredientListPage /></ProtectedRoute>} />
+            <Route path="/ingredients/bulk-edit" element={<ProtectedRoute><IngredientBulkEditPage /></ProtectedRoute>} />
             <Route path="/ingredients/new" element={<ProtectedRoute><IngredientFormPage /></ProtectedRoute>} />
             <Route path="/ingredients/:id/edit" element={<ProtectedRoute><IngredientFormPage /></ProtectedRoute>} />
             <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />

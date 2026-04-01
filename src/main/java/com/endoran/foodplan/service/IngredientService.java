@@ -1,6 +1,7 @@
 package com.endoran.foodplan.service;
 
 import com.endoran.foodplan.dto.BatchCreateIngredientsRequest;
+import com.endoran.foodplan.dto.BulkUpdateIngredientsRequest;
 import com.endoran.foodplan.dto.CreateIngredientRequest;
 import com.endoran.foodplan.dto.IngredientPreparation;
 import com.endoran.foodplan.dto.IngredientResponse;
@@ -107,6 +108,35 @@ public class IngredientService {
             ingredient = ingredientRepository.save(ingredient);
             return toResponse(ingredient);
         }).toList();
+    }
+
+    public List<IngredientResponse> bulkUpdate(String orgId, BulkUpdateIngredientsRequest request) {
+        return request.ingredients().stream().map(entry -> {
+            Ingredient ingredient = findByIdAndOrg(orgId, entry.id());
+            ingredient.setName(entry.name());
+            ingredient.setStorageCategory(entry.storageCategory());
+            ingredient.setGroceryCategory(entry.groceryCategory());
+            ingredient.setDietaryTags(entry.dietaryTags() != null ? entry.dietaryTags() : Collections.emptySet());
+            ingredient.setShoppingListExclude(entry.shoppingListExclude());
+            ingredient.setNeedsReview(false);
+            ingredient = ingredientRepository.save(ingredient);
+            return toResponse(ingredient);
+        }).toList();
+    }
+
+    public List<IngredientResponse> autoCategorize(String orgId) {
+        List<Ingredient> ingredients = ingredientRepository.findByOrgId(orgId);
+        List<Ingredient> updated = ingredients.stream()
+                .filter(Ingredient::isNeedsReview)
+                .peek(ing -> {
+                    IngredientCategoryInference.InferredCategories inferred =
+                            IngredientCategoryInference.infer(ing.getName());
+                    ing.setStorageCategory(inferred.storage());
+                    ing.setGroceryCategory(inferred.grocery());
+                })
+                .toList();
+        ingredientRepository.saveAll(updated);
+        return ingredients.stream().map(this::toResponse).toList();
     }
 
     private Ingredient findByIdAndOrg(String orgId, String id) {

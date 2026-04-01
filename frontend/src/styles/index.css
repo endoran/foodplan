@@ -313,6 +313,18 @@ body {
 .shopping-aisle-items { padding-left: 1rem; font-size: 0.85rem; color: var(--text-secondary); list-style: none; }
 .shopping-aisle-items li { padding: 0.1rem 0; }
 
+/* Bulk edit table */
+.bulk-edit-table td { vertical-align: middle; }
+.bulk-input {
+  width: 100%; padding: 0.3rem 0.5rem; border: 1px solid var(--border);
+  border-radius: var(--radius); font-size: 0.85rem;
+}
+.bulk-select {
+  width: 100%; padding: 0.3rem 0.4rem; border: 1px solid var(--border);
+  border-radius: var(--radius); font-size: 0.8rem;
+}
+.row-dirty { background: #fffbeb; }
+
 /* Responsive */
 @media (max-width: 640px) {
   .content { padding: 1rem; }

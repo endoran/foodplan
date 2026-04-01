@@ -1,6 +1,7 @@
 package com.endoran.foodplan.controller;
 
 import com.endoran.foodplan.dto.BatchCreateIngredientsRequest;
+import com.endoran.foodplan.dto.BulkUpdateIngredientsRequest;
 import com.endoran.foodplan.dto.CreateIngredientRequest;
 import com.endoran.foodplan.dto.IngredientPreparation;
 import com.endoran.foodplan.dto.IngredientResponse;
@@ -81,6 +82,21 @@ public class IngredientController {
             @RequestParam(required = false) DietaryTag dietaryTag) {
         String orgId = jwt.getClaimAsString("orgId");
         return ResponseEntity.ok(ingredientService.list(orgId, name, groceryCategory, dietaryTag));
+    }
+
+    @PutMapping("/bulk")
+    public ResponseEntity<List<IngredientResponse>> bulkUpdate(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody BulkUpdateIngredientsRequest request) {
+        String orgId = jwt.getClaimAsString("orgId");
+        return ResponseEntity.ok(ingredientService.bulkUpdate(orgId, request));
+    }
+
+    @PostMapping("/auto-categorize")
+    public ResponseEntity<List<IngredientResponse>> autoCategorize(
+            @AuthenticationPrincipal Jwt jwt) {
+        String orgId = jwt.getClaimAsString("orgId");
+        return ResponseEntity.ok(ingredientService.autoCategorize(orgId));
     }
 
     @PutMapping("/{id}")

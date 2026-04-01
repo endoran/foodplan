@@ -30,7 +30,10 @@ export function IngredientListPage() {
     <div className="page">
       <div className="page-header">
         <h1>Ingredients</h1>
-        <Link to="/ingredients/new" className="btn btn-primary">New Ingredient</Link>
+        <div className="btn-group">
+          <Link to="/ingredients/bulk-edit" className="btn">Bulk Edit</Link>
+          <Link to="/ingredients/new" className="btn btn-primary">New Ingredient</Link>
+        </div>
       </div>
 
       <form className="search-bar" onSubmit={handleSearch}>
