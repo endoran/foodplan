@@ -34,6 +34,11 @@ public class RecipeScanService {
             "(?:serves?|servings?|yield|makes?)\\s*:?\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern TIME_PATTERN = Pattern.compile(
             "(?:time|prep|cook)\\s*:?\\s*(\\d+)\\s*(?:min|hour|hr)", Pattern.CASE_INSENSITIVE);
+    // Recipe metadata lines to skip (common in printed/web recipes)
+    private static final Pattern METADATA_PATTERN = Pattern.compile(
+            "^(?:course|cuisine|keyword|category|author|calories|total\\s*time|prep\\s*time|cook\\s*time|" +
+            "refrigerat\\w*|resting|cooling|nutrition|yield)\\b.*",
+            Pattern.CASE_INSENSITIVE);
     // Sub-section headers: lines with a colon like "For the Marinade:", "Sauce:"
     // OR short all-letter lines (≤4 words, no digits) like "Soup", "Chicken Rub"
     private static final Pattern SUB_SECTION_WITH_COLON = Pattern.compile(
@@ -226,11 +231,19 @@ public class RecipeScanService {
             }
             if (lower.matches("^(ingredients?)\\s*:?\\s*$")) {
                 inInstructions = false;
+                // Reset — anything before this header was metadata, not ingredients
+                ingredientEntries.clear();
+                currentSection = null;
                 continue;
             }
 
             // Skip servings/time lines
             if (SERVINGS_PATTERN.matcher(line).find() || TIME_PATTERN.matcher(line).find()) {
+                continue;
+            }
+
+            // Skip recipe metadata lines (Course, Cuisine, Keyword, Calories, etc.)
+            if (METADATA_PATTERN.matcher(line).matches()) {
                 continue;
             }
 
