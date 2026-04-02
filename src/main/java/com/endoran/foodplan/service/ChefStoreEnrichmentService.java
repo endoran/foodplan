@@ -45,7 +45,7 @@ public class ChefStoreEnrichmentService implements StoreEnrichmentService {
 
     @Override
     public String storeName() {
-        return "CHEF'STORE";
+        return "Cash 'n Carry";
     }
 
     @Override
