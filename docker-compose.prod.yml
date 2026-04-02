@@ -7,9 +7,9 @@ services:
       JWT_SECRET: jb993ENmSNHXNHGOBr9N2hGt+1JxSMWn4JivGlHi5vSHChLbAI84mwBcERgzhrKl
       CORS_ALLOWED_ORIGINS: http://methuselah.local:3001
       SLACK_ERROR_TOKEN: ${SLACK_ERROR_TOKEN:-}
-      KROGER_CLIENT_ID: ${KROGER_CLIENT_ID:-}
-      KROGER_CLIENT_SECRET: ${KROGER_CLIENT_SECRET:-}
-      KROGER_LOCATION_ID: ${KROGER_LOCATION_ID:-}
+      KROGER_CLIENT_ID: gomezmealplanningcalendar-bbcdrf33
+      KROGER_CLIENT_SECRET: vR7tZvu2jXBQYNtSPQOa4Yx2vV4_9eT9Io_pmHjL
+      KROGER_LOCATION_ID: 70100458
     restart: unless-stopped
 
   frontend:
