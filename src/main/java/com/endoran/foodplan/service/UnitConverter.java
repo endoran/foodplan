@@ -20,6 +20,7 @@ public final class UnitConverter {
         // Volume → TSP
         TO_BASE.put(MeasurementUnit.TSP, BigDecimal.ONE);
         TO_BASE.put(MeasurementUnit.TBSP, new BigDecimal("3"));
+        TO_BASE.put(MeasurementUnit.FL_OZ, new BigDecimal("6"));
         TO_BASE.put(MeasurementUnit.CUP, new BigDecimal("48"));
         TO_BASE.put(MeasurementUnit.PINT, new BigDecimal("96"));
         TO_BASE.put(MeasurementUnit.QUART, new BigDecimal("192"));
@@ -35,6 +36,7 @@ public final class UnitConverter {
     static {
         FAMILIES.put(MeasurementUnit.TSP, UnitFamily.VOLUME);
         FAMILIES.put(MeasurementUnit.TBSP, UnitFamily.VOLUME);
+        FAMILIES.put(MeasurementUnit.FL_OZ, UnitFamily.VOLUME);
         FAMILIES.put(MeasurementUnit.CUP, UnitFamily.VOLUME);
         FAMILIES.put(MeasurementUnit.PINT, UnitFamily.VOLUME);
         FAMILIES.put(MeasurementUnit.QUART, UnitFamily.VOLUME);
@@ -46,7 +48,7 @@ public final class UnitConverter {
 
     // Ordered largest → smallest for readable output (grocery-friendly units only)
     private static final List<MeasurementUnit> VOLUME_UNITS = List.of(
-            MeasurementUnit.CUP, MeasurementUnit.TBSP, MeasurementUnit.TSP);
+            MeasurementUnit.CUP, MeasurementUnit.FL_OZ, MeasurementUnit.TBSP, MeasurementUnit.TSP);
     private static final List<MeasurementUnit> WEIGHT_UNITS = List.of(
             MeasurementUnit.LBS, MeasurementUnit.OZ);
 

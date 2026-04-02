@@ -5,6 +5,7 @@ import com.endoran.foodplan.dto.ShoppingItem;
 import com.endoran.foodplan.dto.ShoppingListResponse;
 import com.endoran.foodplan.dto.StoreProductMatch;
 import com.endoran.foodplan.model.Measurement;
+import com.endoran.foodplan.model.MeasurementUnit;
 import com.endoran.foodplan.model.StoreType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,22 +67,31 @@ public class StoreEnrichmentOrchestrator {
     private ShoppingItem applyMatch(ShoppingItem item, StoreProductMatch match) {
         if (match == null) return item;
 
-        // Try to calculate package-aware pricing
         Integer qtyNeeded = null;
         BigDecimal totalPrice = match.storePrice();
         BigDecimal totalPromo = match.storePromoPrice();
 
         Measurement packageMeasurement = PackageSizeParser.parse(match.storePackageSize());
         if (packageMeasurement != null) {
-            UnitConverter.UnitFamily packageFamily = UnitConverter.getFamily(packageMeasurement.getUnit());
-            UnitConverter.UnitFamily shoppingFamily = UnitConverter.getFamily(item.unit());
+            MeasurementUnit pkgUnit = packageMeasurement.getUnit();
+            MeasurementUnit shopUnit = item.unit();
+            UnitConverter.UnitFamily packageFamily = UnitConverter.getFamily(pkgUnit);
+            UnitConverter.UnitFamily shoppingFamily = UnitConverter.getFamily(shopUnit);
+
+            // Cross-family bridge: recipe OZ (weight) ↔ store FL_OZ (volume).
+            // 1 oz weight ≈ 1 fl oz volume for dense items — close enough for shopping.
+            if (shoppingFamily == UnitConverter.UnitFamily.WEIGHT
+                    && shopUnit == MeasurementUnit.OZ
+                    && packageFamily == UnitConverter.UnitFamily.VOLUME) {
+                shopUnit = MeasurementUnit.FL_OZ;
+                shoppingFamily = UnitConverter.UnitFamily.VOLUME;
+            }
 
             if (packageFamily != UnitConverter.UnitFamily.NONE
                     && packageFamily == shoppingFamily) {
-                // Convert both to base units and calculate needed packages
                 BigDecimal packageBase = UnitConverter.toBaseUnits(
-                        packageMeasurement.getQuantity(), packageMeasurement.getUnit());
-                BigDecimal shoppingBase = UnitConverter.toBaseUnits(item.quantity(), item.unit());
+                        packageMeasurement.getQuantity(), pkgUnit);
+                BigDecimal shoppingBase = UnitConverter.toBaseUnits(item.quantity(), shopUnit);
 
                 if (packageBase.compareTo(BigDecimal.ZERO) > 0) {
                     int packages = shoppingBase.divide(packageBase, 0, RoundingMode.CEILING).intValue();
@@ -95,6 +105,9 @@ public class StoreEnrichmentOrchestrator {
                         totalPromo = match.storePromoPrice().multiply(BigDecimal.valueOf(packages));
                     }
                 }
+            } else {
+                log.debug("Cannot calculate packages for '{}': shopping unit {} ({}) vs package unit {} ({})",
+                        item.ingredientName(), item.unit(), shoppingFamily, pkgUnit, packageFamily);
             }
         }
 

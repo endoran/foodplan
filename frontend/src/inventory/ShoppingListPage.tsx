@@ -68,7 +68,7 @@ export function ShoppingListPage() {
   };
 
   const hasStore = !!result?.storeName;
-  const colCount = hasStore ? 6 : 3;
+  const colCount = hasStore ? 9 : 3;
 
   const total = hasStore
     ? result!.aisles.flatMap(a => a.items).reduce((sum, item) => {
@@ -125,6 +125,9 @@ export function ShoppingListPage() {
               {hasStore && <th>Aisle</th>}
               <th>Quantity</th>
               <th>Unit</th>
+              {hasStore && <th>Store Product</th>}
+              {hasStore && <th>Pkg Size</th>}
+              {hasStore && <th>Pkg Qty</th>}
               {hasStore && <th>Price</th>}
               {hasStore && <th>Stock</th>}
             </tr>
@@ -136,15 +139,15 @@ export function ShoppingListPage() {
                   <td colSpan={colCount}><strong>{formatEnum(aisle.category)}</strong></td>
                 </tr>
                 {aisle.items.map(item => {
-                  const pkgInfo = item.storeQtyNeeded && item.storePackageSize
-                    ? `${item.storeQtyNeeded} x ${item.storePackageSize}`
-                    : undefined;
                   return (
-                    <tr key={item.ingredientId} title={item.storeProductName || undefined}>
+                    <tr key={item.ingredientId}>
                       <td>{item.ingredientName}</td>
                       {hasStore && <td>{item.storeAisle || '-'}</td>}
                       <td>{formatQty(Number(item.quantity))}</td>
                       <td>{formatEnum(item.unit)}</td>
+                      {hasStore && <td className="muted" style={{ fontSize: '0.85rem' }}>{item.storeProductName || '-'}</td>}
+                      {hasStore && <td>{item.storePackageSize || '-'}</td>}
+                      {hasStore && <td>{item.storeQtyNeeded ?? '-'}</td>}
                       {hasStore && (
                         <td>
                           {item.storePromoPrice != null ? (
@@ -155,7 +158,6 @@ export function ShoppingListPage() {
                           ) : (
                             formatPrice(item.storePrice) || '-'
                           )}
-                          {pkgInfo && <span className="muted" style={{ marginLeft: '0.3rem', fontSize: '0.75rem' }}>({pkgInfo})</span>}
                         </td>
                       )}
                       {hasStore && (
@@ -175,7 +177,7 @@ export function ShoppingListPage() {
           {hasStore && total > 0 && (
             <tfoot>
               <tr className="shopping-total">
-                <td colSpan={4} style={{ textAlign: 'right' }}>Estimated Total</td>
+                <td colSpan={7} style={{ textAlign: 'right' }}>Estimated Total</td>
                 <td><strong>{formatPrice(total)}</strong></td>
                 <td></td>
               </tr>

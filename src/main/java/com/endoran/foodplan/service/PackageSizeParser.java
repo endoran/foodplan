@@ -14,14 +14,14 @@ import java.util.regex.Pattern;
 public final class PackageSizeParser {
 
     private static final Pattern SIZE_PATTERN = Pattern.compile(
-            "(\\d+\\.?\\d*)\\s*(fl\\s*oz|oz|lbs?|gal(?:lon)?|qt|pt|cup|tbsp|tsp)",
+            "(\\d+\\.?\\d*)\\s*(fl\\s*oz|oz|lbs?|gal(?:lon)?|qt|pt|cup|tbsp|tsp|ct|each|count)",
             Pattern.CASE_INSENSITIVE
     );
 
     private static final Map<String, MeasurementUnit> UNIT_MAP = Map.ofEntries(
-            Map.entry("oz", MeasurementUnit.OZ),
-            Map.entry("fl oz", MeasurementUnit.OZ),
-            Map.entry("floz", MeasurementUnit.OZ),
+            Map.entry("oz", MeasurementUnit.FL_OZ),
+            Map.entry("fl oz", MeasurementUnit.FL_OZ),
+            Map.entry("floz", MeasurementUnit.FL_OZ),
             Map.entry("lb", MeasurementUnit.LBS),
             Map.entry("lbs", MeasurementUnit.LBS),
             Map.entry("gal", MeasurementUnit.GALLON),
@@ -30,7 +30,10 @@ public final class PackageSizeParser {
             Map.entry("pt", MeasurementUnit.PINT),
             Map.entry("cup", MeasurementUnit.CUP),
             Map.entry("tbsp", MeasurementUnit.TBSP),
-            Map.entry("tsp", MeasurementUnit.TSP)
+            Map.entry("tsp", MeasurementUnit.TSP),
+            Map.entry("ct", MeasurementUnit.WHOLE),
+            Map.entry("each", MeasurementUnit.WHOLE),
+            Map.entry("count", MeasurementUnit.WHOLE)
     );
 
     private PackageSizeParser() {}
