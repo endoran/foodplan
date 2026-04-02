@@ -36,6 +36,9 @@ dependencies {
     // OCR for recipe scan-in
     implementation 'net.sourceforge.tess4j:tess4j:5.13.0'
 
+    // EXIF orientation for recipe scan photos
+    implementation 'com.drewnoakes:metadata-extractor:2.19.0'
+
     // PDF rendering for recipe scan-in
     implementation 'org.apache.pdfbox:pdfbox:3.0.4'
 

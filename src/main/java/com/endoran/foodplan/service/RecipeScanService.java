@@ -2,11 +2,16 @@ package com.endoran.foodplan.service;
 
 import com.endoran.foodplan.dto.ImportedIngredientPreview;
 import com.endoran.foodplan.dto.ImportedRecipePreview;
+import com.drew.imaging.ImageMetadataReader;
+import com.drew.metadata.Metadata;
+import com.drew.metadata.exif.ExifIFD0Directory;
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -22,6 +27,8 @@ import java.util.regex.Pattern;
 
 @Service
 public class RecipeScanService {
+
+    private static final Logger log = LoggerFactory.getLogger(RecipeScanService.class);
 
     private static final Pattern SERVINGS_PATTERN = Pattern.compile(
             "(?:serves?|servings?|yield|makes?)\\s*:?\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
@@ -59,10 +66,55 @@ public class RecipeScanService {
             if (image == null) {
                 throw new RecipeImportException("Could not read image file — supported formats: JPG, PNG, TIFF, BMP");
             }
+
+            // Apply EXIF orientation — iPhone photos are stored rotated with an EXIF
+            // tag that viewers apply automatically, but ImageIO.read() ignores it.
+            image = applyExifOrientation(file, image);
+
             return ocrBufferedImage(image);
         } catch (IOException e) {
             throw new RecipeImportException("Failed to read image: " + e.getMessage(), e);
         }
+    }
+
+    private BufferedImage applyExifOrientation(MultipartFile file, BufferedImage image) {
+        try {
+            Metadata metadata = ImageMetadataReader.readMetadata(file.getInputStream());
+            ExifIFD0Directory exif = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
+            if (exif == null || !exif.containsTag(ExifIFD0Directory.TAG_ORIENTATION)) {
+                return image;
+            }
+
+            int orientation = exif.getInt(ExifIFD0Directory.TAG_ORIENTATION);
+            log.info("EXIF orientation tag: {}", orientation);
+
+            return switch (orientation) {
+                case 3 -> rotateImage(image, Math.PI);           // 180°
+                case 6 -> rotateImage(image, Math.PI / 2);       // 90° CW
+                case 8 -> rotateImage(image, -Math.PI / 2);      // 90° CCW
+                default -> image;                                 // 1 = normal, others are mirrored (rare)
+            };
+        } catch (Exception e) {
+            log.warn("Could not read EXIF orientation: {}", e.getMessage());
+            return image;
+        }
+    }
+
+    private BufferedImage rotateImage(BufferedImage src, double radians) {
+        int w = src.getWidth();
+        int h = src.getHeight();
+        boolean is90 = Math.abs(Math.abs(radians) - Math.PI / 2) < 0.01;
+        int newW = is90 ? h : w;
+        int newH = is90 ? w : h;
+
+        BufferedImage rotated = new BufferedImage(newW, newH, src.getType());
+        java.awt.Graphics2D g = rotated.createGraphics();
+        g.translate(newW / 2.0, newH / 2.0);
+        g.rotate(radians);
+        g.translate(-w / 2.0, -h / 2.0);
+        g.drawImage(src, 0, 0, null);
+        g.dispose();
+        return rotated;
     }
 
     private String ocrPdf(MultipartFile file) {
