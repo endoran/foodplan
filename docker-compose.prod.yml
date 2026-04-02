@@ -9,7 +9,7 @@ services:
       SLACK_ERROR_TOKEN: ${SLACK_ERROR_TOKEN:-}
       KROGER_CLIENT_ID: gomezmealplanningcalendar-bbcdrf33
       KROGER_CLIENT_SECRET: vR7tZvu2jXBQYNtSPQOa4Yx2vV4_9eT9Io_pmHjL
-      KROGER_LOCATION_ID: 70100458
+      KROGER_LOCATION_ID: 70100681
     restart: unless-stopped
 
   frontend:
