@@ -157,6 +157,7 @@ public class KrogerEnrichmentService implements StoreEnrichmentService {
         BigDecimal price = null;
         BigDecimal promoPrice = null;
         String stockLevel = null;
+        String packageSize = null;
 
         JsonNode items = product.get("items");
         if (items != null && !items.isEmpty()) {
@@ -179,8 +180,12 @@ public class KrogerEnrichmentService implements StoreEnrichmentService {
                     default -> "OUT";
                 };
             }
+
+            if (item.has("size") && !item.get("size").isNull()) {
+                packageSize = item.get("size").asText();
+            }
         }
 
-        return new StoreProductMatch(aisle, price, promoPrice, stockLevel, productName);
+        return new StoreProductMatch(aisle, price, promoPrice, stockLevel, productName, packageSize);
     }
 }

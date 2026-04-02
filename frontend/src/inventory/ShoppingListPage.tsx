@@ -72,8 +72,8 @@ export function ShoppingListPage() {
 
   const total = hasStore
     ? result!.aisles.flatMap(a => a.items).reduce((sum, item) => {
-        const unitPrice = item.storePromoPrice ?? item.storePrice;
-        return sum + (unitPrice != null ? unitPrice * Number(item.quantity) : 0);
+        const price = item.storePromoPrice ?? item.storePrice;
+        return sum + (price ?? 0);
       }, 0)
     : 0;
 
@@ -130,54 +130,47 @@ export function ShoppingListPage() {
             </tr>
           </thead>
           <tbody>
-            {result.aisles.map(aisle => {
-              const qty = (item: typeof aisle.items[0]) => Number(item.quantity);
-              return (
-                <Fragment key={aisle.category}>
-                  <tr className="aisle-header-row">
-                    <td colSpan={colCount}><strong>{formatEnum(aisle.category)}</strong></td>
-                  </tr>
-                  {aisle.items.map(item => {
-                    const linePrice = item.storePromoPrice != null
-                      ? item.storePromoPrice * qty(item)
-                      : item.storePrice != null
-                        ? item.storePrice * qty(item)
-                        : undefined;
-                    const lineRegular = item.storePromoPrice != null && item.storePrice != null
-                      ? item.storePrice * qty(item)
-                      : undefined;
-                    return (
-                      <tr key={item.ingredientId} title={item.storeProductName || undefined}>
-                        <td>{item.ingredientName}</td>
-                        {hasStore && <td>{item.storeAisle || '-'}</td>}
-                        <td>{formatQty(qty(item))}</td>
-                        <td>{formatEnum(item.unit)}</td>
-                        {hasStore && (
-                          <td>
-                            {item.storePromoPrice != null ? (
-                              <>
-                                <span className="price-promo">{formatPrice(linePrice)}</span>
-                                <span className="price-regular-struck">{formatPrice(lineRegular)}</span>
-                              </>
-                            ) : (
-                              formatPrice(linePrice) || '-'
-                            )}
-                          </td>
-                        )}
-                        {hasStore && (
-                          <td>
-                            {item.storeStockLevel === 'HIGH' && <span className="stock-high">In Stock</span>}
-                            {item.storeStockLevel === 'LOW' && <span className="stock-low">Low</span>}
-                            {item.storeStockLevel === 'OUT' && <span className="stock-out">Out</span>}
-                            {!item.storeStockLevel && '-'}
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-                </Fragment>
-              );
-            })}
+            {result.aisles.map(aisle => (
+              <Fragment key={aisle.category}>
+                <tr className="aisle-header-row">
+                  <td colSpan={colCount}><strong>{formatEnum(aisle.category)}</strong></td>
+                </tr>
+                {aisle.items.map(item => {
+                  const pkgInfo = item.storeQtyNeeded && item.storePackageSize
+                    ? `${item.storeQtyNeeded} x ${item.storePackageSize}`
+                    : undefined;
+                  return (
+                    <tr key={item.ingredientId} title={item.storeProductName || undefined}>
+                      <td>{item.ingredientName}</td>
+                      {hasStore && <td>{item.storeAisle || '-'}</td>}
+                      <td>{formatQty(Number(item.quantity))}</td>
+                      <td>{formatEnum(item.unit)}</td>
+                      {hasStore && (
+                        <td>
+                          {item.storePromoPrice != null ? (
+                            <>
+                              <span className="price-promo">{formatPrice(item.storePromoPrice)}</span>
+                              <span className="price-regular-struck">{formatPrice(item.storePrice)}</span>
+                            </>
+                          ) : (
+                            formatPrice(item.storePrice) || '-'
+                          )}
+                          {pkgInfo && <span className="muted" style={{ marginLeft: '0.3rem', fontSize: '0.75rem' }}>({pkgInfo})</span>}
+                        </td>
+                      )}
+                      {hasStore && (
+                        <td>
+                          {item.storeStockLevel === 'HIGH' && <span className="stock-high">In Stock</span>}
+                          {item.storeStockLevel === 'LOW' && <span className="stock-low">Low</span>}
+                          {item.storeStockLevel === 'OUT' && <span className="stock-out">Out</span>}
+                          {!item.storeStockLevel && '-'}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </Fragment>
+            ))}
           </tbody>
           {hasStore && total > 0 && (
             <tfoot>

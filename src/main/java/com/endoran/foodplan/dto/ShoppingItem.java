@@ -15,9 +15,11 @@ public record ShoppingItem(
         BigDecimal storePrice,
         BigDecimal storePromoPrice,
         String storeStockLevel,
-        String storeProductName
+        String storeProductName,
+        String storePackageSize,
+        Integer storeQtyNeeded
 ) {
     public ShoppingItem(String ingredientId, String ingredientName, BigDecimal quantity, MeasurementUnit unit) {
-        this(ingredientId, ingredientName, quantity, unit, null, null, null, null, null);
+        this(ingredientId, ingredientName, quantity, unit, null, null, null, null, null, null, null);
     }
 }

@@ -16,6 +16,8 @@ export interface ShoppingItem {
   storePromoPrice?: number;
   storeStockLevel?: string;
   storeProductName?: string;
+  storePackageSize?: string;
+  storeQtyNeeded?: number;
 }
 
 export interface ShoppingAisle {

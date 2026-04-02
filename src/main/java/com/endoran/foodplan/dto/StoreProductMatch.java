@@ -7,5 +7,6 @@ public record StoreProductMatch(
         BigDecimal storePrice,
         BigDecimal storePromoPrice,
         String storeStockLevel,
-        String storeProductName
+        String storeProductName,
+        String storePackageSize
 ) {}

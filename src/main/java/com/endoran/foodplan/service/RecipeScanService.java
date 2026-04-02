@@ -90,16 +90,65 @@ public class RecipeScanService {
 
     private String ocrBufferedImage(BufferedImage image) {
         try {
+            BufferedImage processed = preprocessForOcr(image);
             Tesseract tesseract = new Tesseract();
             tesseract.setLanguage("eng");
             String datapath = System.getenv("TESSDATA_PREFIX");
             if (datapath != null && !datapath.isEmpty()) {
                 tesseract.setDatapath(datapath);
             }
-            return tesseract.doOCR(image);
+            tesseract.setOcrEngineMode(1);  // OEM_LSTM_ONLY
+            tesseract.setPageSegMode(3);    // PSM_AUTO
+            tesseract.setVariable("user_defined_dpi", "300");
+            return tesseract.doOCR(processed);
         } catch (TesseractException e) {
             throw new RecipeImportException("OCR failed: " + e.getMessage(), e);
         }
+    }
+
+    private BufferedImage preprocessForOcr(BufferedImage image) {
+        int w = image.getWidth();
+        int h = image.getHeight();
+
+        // Convert to grayscale
+        BufferedImage gray = new BufferedImage(w, h, BufferedImage.TYPE_BYTE_GRAY);
+        gray.getGraphics().drawImage(image, 0, 0, null);
+
+        // Adaptive threshold: compare each pixel to local mean in a window.
+        // Pixels darker than (localMean - bias) become black, rest become white.
+        // This handles uneven lighting/glare from plastic page protectors.
+        int windowSize = Math.max(w, h) / 20 | 1; // ~5% of image, must be odd
+        int halfW = windowSize / 2;
+        int bias = 10;
+        byte[] pixels = ((java.awt.image.DataBufferByte) gray.getRaster().getDataBuffer()).getData();
+
+        // Build integral image for fast local mean
+        long[] integral = new long[(w + 1) * (h + 1)];
+        for (int y = 0; y < h; y++) {
+            long rowSum = 0;
+            for (int x = 0; x < w; x++) {
+                rowSum += pixels[y * w + x] & 0xFF;
+                integral[(y + 1) * (w + 1) + (x + 1)] = rowSum + integral[y * (w + 1) + (x + 1)];
+            }
+        }
+
+        BufferedImage result = new BufferedImage(w, h, BufferedImage.TYPE_BYTE_GRAY);
+        byte[] output = ((java.awt.image.DataBufferByte) result.getRaster().getDataBuffer()).getData();
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int x1 = Math.max(0, x - halfW);
+                int y1 = Math.max(0, y - halfW);
+                int x2 = Math.min(w, x + halfW + 1);
+                int y2 = Math.min(h, y + halfW + 1);
+                int area = (x2 - x1) * (y2 - y1);
+                long sum = integral[y2 * (w + 1) + x2] - integral[y1 * (w + 1) + x2]
+                         - integral[y2 * (w + 1) + x1] + integral[y1 * (w + 1) + x1];
+                int localMean = (int) (sum / area);
+                int pixel = pixels[y * w + x] & 0xFF;
+                output[y * w + x] = (byte) (pixel < localMean - bias ? 0 : 255);
+            }
+        }
+        return result;
     }
 
     ImportedRecipePreview parseScannedText(String text) {

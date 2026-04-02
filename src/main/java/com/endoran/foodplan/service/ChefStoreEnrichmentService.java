@@ -99,6 +99,7 @@ public class ChefStoreEnrichmentService implements StoreEnrichmentService {
             String regPriceStr = getStoreField(hit, "unitRegPrice");
             String area = getStoreField(hit, "area");
             String lowStock = getStoreField(hit, "lowStock");
+            String itemSize = getStoreField(hit, "itemSize");
 
             BigDecimal price = parsePrice(priceStr);
             BigDecimal regPrice = parsePrice(regPriceStr);
@@ -113,7 +114,7 @@ public class ChefStoreEnrichmentService implements StoreEnrichmentService {
             String stockLevel = "HIGH";
             if ("1".equals(lowStock)) stockLevel = "LOW";
 
-            return new StoreProductMatch(area, price, promoPrice, stockLevel, productName);
+            return new StoreProductMatch(area, price, promoPrice, stockLevel, productName, itemSize);
         }
 
         return null;
