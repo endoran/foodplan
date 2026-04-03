@@ -1,0 +1,28 @@
+services:
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build: .
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/food
+      JWT_SECRET: dGhpcyBpcyBhIGRldiBzZWNyZXQga2V5IHRoYXQgaXMgbG9uZyBlbm91Z2ggZm9yIEhNQUMtU0hBMjU2IHNpZ25pbmc=
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+
+volumes:
+  mongo-data:

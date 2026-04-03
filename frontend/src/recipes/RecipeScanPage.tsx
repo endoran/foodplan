@@ -1,0 +1,347 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { apiPost } from '../api/client';
+import { formatEnum } from '../utils/formatEnum';
+
+interface ImportedIngredient {
+  section: string | null;
+  name: string;
+  quantity: number;
+  unit: string;
+  rawText: string;
+}
+
+interface ImportedPreview {
+  name: string;
+  instructions: string;
+  baseServings: number;
+  ingredients: ImportedIngredient[];
+  sourceUrl: string;
+}
+
+interface IngredientPreparation {
+  name: string;
+  status: 'EXISTING' | 'NEW';
+  storageCategory: string;
+  groceryCategory: string;
+  shoppingListExclude: boolean;
+}
+
+const UNITS = ['TSP', 'TBSP', 'CUP', 'PINT', 'QUART', 'GALLON', 'HALF_GALLON', 'WHOLE', 'LBS', 'OZ', 'PINCH', 'PIECE'];
+const STORAGE_CATEGORIES = ['PANTRY', 'FROZEN', 'FRESH', 'REFRIGERATED', 'SPICE_RACK', 'COUNTER'];
+const GROCERY_CATEGORIES = ['PRODUCE', 'MEAT', 'DAIRY', 'BAKING', 'SPICES', 'ETHNIC', 'BULK', 'CANNED', 'BAKERY', 'DELI', 'HOUSEHOLD', 'OILS_CONDIMENTS', 'FROZEN'];
+
+export function RecipeScanPage() {
+  const navigate = useNavigate();
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [preview, setPreview] = useState<ImportedPreview | null>(null);
+
+  const [name, setName] = useState('');
+  const [instructions, setInstructions] = useState('');
+  const [baseServings, setBaseServings] = useState(1);
+  const [ingredients, setIngredients] = useState<ImportedIngredient[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  const [step, setStep] = useState<'edit' | 'review'>('edit');
+  const [newIngredients, setNewIngredients] = useState<IngredientPreparation[]>([]);
+
+  const handleScan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!file) return;
+    setError('');
+    setLoading(true);
+    setPreview(null);
+    setStep('edit');
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/v1/recipes/scan', {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({ error: 'Scan failed' }));
+        throw new Error(body.error || `HTTP ${response.status}`);
+      }
+
+      const data: ImportedPreview = await response.json();
+      setPreview(data);
+      setName(data.name);
+      setInstructions(data.instructions);
+      setBaseServings(data.baseServings);
+      setIngredients(data.ingredients);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Scan failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateIngredient = (index: number, field: keyof ImportedIngredient, value: string | number) => {
+    const updated = [...ingredients];
+    updated[index] = { ...updated[index], [field]: value };
+    setIngredients(updated);
+  };
+
+  const removeIngredient = (index: number) => {
+    setIngredients(ingredients.filter((_, i) => i !== index));
+  };
+
+  const handleSave = async () => {
+    setError('');
+    setSaving(true);
+    try {
+      const names = ingredients.map(ing => ing.name);
+      const preparations = await apiPost<IngredientPreparation[]>(
+        '/api/v1/ingredients/prepare', { ingredientNames: names });
+      const newOnes = preparations.filter(p => p.status === 'NEW');
+
+      if (newOnes.length > 0) {
+        setNewIngredients(newOnes);
+        setStep('review');
+      } else {
+        await saveRecipe();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveRecipe = async () => {
+    const body = {
+      name,
+      instructions: instructions || null,
+      baseServings,
+      ingredients: ingredients.map(ing => ({
+        section: ing.section || null,
+        ingredientId: '',
+        ingredientName: ing.name,
+        quantity: ing.quantity,
+        unit: ing.unit,
+      })),
+    };
+    const created = await apiPost<{ id: string }>('/api/v1/recipes', body);
+    navigate(`/recipes/${created.id}`);
+  };
+
+  const handleConfirmAndSave = async () => {
+    setError('');
+    setSaving(true);
+    try {
+      await apiPost('/api/v1/ingredients/batch', {
+        ingredients: newIngredients.map(ing => ({
+          name: ing.name,
+          storageCategory: ing.storageCategory,
+          groceryCategory: ing.groceryCategory,
+          shoppingListExclude: ing.shoppingListExclude,
+        })),
+      });
+      await saveRecipe();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateNewIngredient = (index: number, field: keyof IngredientPreparation, value: string | boolean) => {
+    const updated = [...newIngredients];
+    updated[index] = { ...updated[index], [field]: value };
+    setNewIngredients(updated);
+  };
+
+  return (
+    <div className="page">
+      <h1>Scan Recipe Card</h1>
+
+      <form onSubmit={handleScan} className="recipe-form" style={{ marginBottom: '1.5rem' }}>
+        <label>
+          Upload photo or PDF of recipe
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            onChange={e => setFile(e.target.files?.[0] || null)}
+            required
+          />
+        </label>
+        <button type="submit" className="btn btn-primary" disabled={loading || !file}>
+          {loading ? 'Scanning...' : 'Scan'}
+        </button>
+      </form>
+
+      {error && <div className="error">{error}</div>}
+
+      {step === 'edit' && preview && (
+        <div className="recipe-form">
+          <p className="muted">Scanned text extracted via OCR — review and edit below</p>
+
+          <label>
+            Recipe Name
+            <input type="text" value={name} onChange={e => setName(e.target.value)} required />
+          </label>
+
+          <label>
+            Instructions
+            <textarea value={instructions} onChange={e => setInstructions(e.target.value)} rows={6} />
+          </label>
+
+          <label>
+            Base Servings
+            <input
+              type="number"
+              value={baseServings}
+              onChange={e => setBaseServings(parseInt(e.target.value) || 1)}
+              min={1}
+            />
+          </label>
+
+          <div className="section">
+            <div className="section-header">
+              <h2>Ingredients (review & edit)</h2>
+            </div>
+            <p className="muted">New ingredients will be reviewed in the next step.</p>
+            {(() => {
+              const groups: { section: string | null; startIndex: number }[] = [];
+              ingredients.forEach((ing, i) => {
+                if (i === 0 || ing.section !== ingredients[i - 1].section) {
+                  groups.push({ section: ing.section, startIndex: i });
+                }
+              });
+
+              return groups.map((group, gi) => {
+                const nextStart = gi + 1 < groups.length ? groups[gi + 1].startIndex : ingredients.length;
+                const groupIngs = ingredients.slice(group.startIndex, nextStart);
+                return (
+                  <div key={gi} style={{ marginBottom: '1rem' }}>
+                    {group.section && (
+                      <input
+                        type="text"
+                        value={group.section}
+                        onChange={e => {
+                          const newSection = e.target.value;
+                          const updated = [...ingredients];
+                          for (let j = group.startIndex; j < nextStart; j++) {
+                            updated[j] = { ...updated[j], section: newSection };
+                          }
+                          setIngredients(updated);
+                        }}
+                        className="section-label-input"
+                        style={{ fontWeight: 'bold', fontSize: '1rem', marginBottom: '0.25rem', border: 'none', borderBottom: '1px solid #ccc', background: 'transparent', width: '100%' }}
+                      />
+                    )}
+                    {groupIngs.map((ing, j) => {
+                      const i = group.startIndex + j;
+                      return (
+                        <div key={i} className="ingredient-row">
+                          <input
+                            type="text"
+                            value={ing.name}
+                            onChange={e => updateIngredient(i, 'name', e.target.value)}
+                            style={{ flex: 2 }}
+                            placeholder="Ingredient name"
+                          />
+                          <input
+                            type="number"
+                            value={ing.quantity}
+                            onChange={e => updateIngredient(i, 'quantity', parseFloat(e.target.value) || 0)}
+                            step="0.01"
+                            min="0"
+                            style={{ flex: 1 }}
+                          />
+                          <select
+                            value={ing.unit}
+                            onChange={e => updateIngredient(i, 'unit', e.target.value)}
+                            style={{ flex: 1 }}
+                          >
+                            {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                          </select>
+                          <button type="button" className="btn btn-danger btn-small" onClick={() => removeIngredient(i)}>X</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              });
+            })()}
+            {ingredients.length === 0 && <p className="muted">No ingredients parsed from scan</p>}
+          </div>
+
+          <div className="btn-group">
+            <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+              {saving ? 'Checking ingredients...' : 'Save Recipe'}
+            </button>
+            <button className="btn" onClick={() => { setPreview(null); setFile(null); }}>Discard</button>
+          </div>
+        </div>
+      )}
+
+      {step === 'review' && (
+        <div className="recipe-form">
+          <h2>Review New Ingredients</h2>
+          <p className="muted">These ingredients don't exist yet. Confirm their categories before saving.</p>
+
+          <table className="ingredients-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Storage</th>
+                <th>Grocery Aisle</th>
+                <th>Exclude from List</th>
+              </tr>
+            </thead>
+            <tbody>
+              {newIngredients.map((ing, i) => (
+                <tr key={i}>
+                  <td>{ing.name}</td>
+                  <td>
+                    <select
+                      value={ing.storageCategory}
+                      onChange={e => updateNewIngredient(i, 'storageCategory', e.target.value)}
+                    >
+                      {STORAGE_CATEGORIES.map(c => (
+                        <option key={c} value={c}>{formatEnum(c)}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <select
+                      value={ing.groceryCategory}
+                      onChange={e => updateNewIngredient(i, 'groceryCategory', e.target.value)}
+                    >
+                      {GROCERY_CATEGORIES.map(c => (
+                        <option key={c} value={c}>{formatEnum(c)}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={ing.shoppingListExclude}
+                      onChange={e => updateNewIngredient(i, 'shoppingListExclude', e.target.checked)}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="btn-group">
+            <button className="btn btn-primary" onClick={handleConfirmAndSave} disabled={saving}>
+              {saving ? 'Saving...' : 'Confirm & Save'}
+            </button>
+            <button className="btn" onClick={() => setStep('edit')}>Back</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

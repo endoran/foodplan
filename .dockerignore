@@ -1,0 +1,14 @@
+.gradle/
+build/
+.idea/
+.git/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+.tool-versions
+.svn/
+out/
+bin/
+target/
+frontend/

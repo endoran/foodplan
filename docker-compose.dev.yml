@@ -1,0 +1,17 @@
+services:
+  mongo:
+    ports:
+      - "27017:27017"
+
+  backend:
+    ports:
+      - "8080:8080"
+    environment:
+      SLACK_ERROR_TOKEN: ${SLACK_ERROR_TOKEN:-}
+      KROGER_CLIENT_ID: ${KROGER_CLIENT_ID:-}
+      KROGER_CLIENT_SECRET: ${KROGER_CLIENT_SECRET:-}
+      KROGER_LOCATION_ID: ${KROGER_LOCATION_ID:-}
+
+  frontend:
+    ports:
+      - "3000:80"
