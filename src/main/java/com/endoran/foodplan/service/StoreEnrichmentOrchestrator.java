@@ -28,7 +28,8 @@ public class StoreEnrichmentOrchestrator {
             KrogerEnrichmentService kroger) {
         this.services = Map.of(
                 StoreType.CHEF_STORE, chefStore,
-                StoreType.FRED_MEYER, kroger
+                StoreType.FRED_MEYER, kroger,
+                StoreType.FRED_MEYER_ONLINE, kroger
         );
     }
 
@@ -36,9 +37,13 @@ public class StoreEnrichmentOrchestrator {
         StoreEnrichmentService service = services.get(storeType);
         if (service == null) return baseList;
 
-        if (storeType == StoreType.FRED_MEYER && service instanceof KrogerEnrichmentService k && !k.isConfigured()) {
+        if ((storeType == StoreType.FRED_MEYER || storeType == StoreType.FRED_MEYER_ONLINE)
+                && service instanceof KrogerEnrichmentService k && !k.isConfigured()) {
             return baseList;
         }
+
+        boolean isOnlineOnly = storeType == StoreType.FRED_MEYER_ONLINE;
+        boolean isInStore = storeType == StoreType.FRED_MEYER;
 
         try {
             List<String> names = baseList.aisles().stream()
@@ -48,19 +53,74 @@ public class StoreEnrichmentOrchestrator {
 
             Map<String, StoreProductMatch> matches = service.enrich(names);
 
+            Map<String, StoreProductMatch> finalMatches;
+            if (isInStore) {
+                finalMatches = stripFulfillmentAisles(matches);
+            } else if (isOnlineOnly) {
+                finalMatches = keepOnlyFulfillmentItems(matches);
+            } else {
+                finalMatches = matches;
+            }
+
             List<ShoppingAisle> enrichedAisles = baseList.aisles().stream()
                     .map(aisle -> new ShoppingAisle(
                             aisle.category(),
                             aisle.items().stream()
-                                    .map(item -> applyMatch(item, matches.get(item.ingredientName())))
+                                    .map(item -> applyMatch(item, finalMatches.get(item.ingredientName())))
                                     .toList()
                     ))
                     .toList();
 
-            return new ShoppingListResponse(enrichedAisles, service.storeName());
+            String displayName = storeType == StoreType.FRED_MEYER_ONLINE
+                    ? "Fred Meyer (Online)" : service.storeName();
+            return new ShoppingListResponse(enrichedAisles, displayName);
         } catch (Exception e) {
             log.warn("Store enrichment failed for {}: {}", storeType, e.getMessage());
             return baseList;
+        }
+    }
+
+    /**
+     * In-store mode: keep all items but null out aisle for fulfillment-only locations (>= 100).
+     */
+    private Map<String, StoreProductMatch> stripFulfillmentAisles(Map<String, StoreProductMatch> matches) {
+        Map<String, StoreProductMatch> filtered = new java.util.HashMap<>();
+        for (var entry : matches.entrySet()) {
+            StoreProductMatch match = entry.getValue();
+            if (isFulfillmentAisle(match.storeAisle())) {
+                filtered.put(entry.getKey(), new StoreProductMatch(
+                        null, match.storePrice(), match.storePromoPrice(),
+                        match.storeStockLevel(), match.storeProductName(), match.storePackageSize()));
+            } else {
+                filtered.put(entry.getKey(), match);
+            }
+        }
+        return filtered;
+    }
+
+    /**
+     * Online mode: only keep items that have fulfillment-only aisles (>= 100).
+     * Items available in-store are excluded entirely.
+     */
+    private Map<String, StoreProductMatch> keepOnlyFulfillmentItems(Map<String, StoreProductMatch> matches) {
+        Map<String, StoreProductMatch> filtered = new java.util.HashMap<>();
+        for (var entry : matches.entrySet()) {
+            StoreProductMatch match = entry.getValue();
+            if (isFulfillmentAisle(match.storeAisle())) {
+                filtered.put(entry.getKey(), match);
+            }
+        }
+        return filtered;
+    }
+
+    private boolean isFulfillmentAisle(String aisle) {
+        if (aisle == null || aisle.isBlank()) return false;
+        String digits = aisle.replaceAll("[^0-9]", "");
+        if (digits.isEmpty()) return false;
+        try {
+            return Integer.parseInt(digits) >= 100;
+        } catch (NumberFormatException e) {
+            return false;
         }
     }
 

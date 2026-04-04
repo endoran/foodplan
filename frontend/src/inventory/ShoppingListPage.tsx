@@ -7,6 +7,7 @@ const STORES = [
   { value: '', label: 'No Store' },
   { value: 'CHEF_STORE', label: "Cash 'n Carry" },
   { value: 'FRED_MEYER', label: 'Fred Meyer' },
+  { value: 'FRED_MEYER_ONLINE', label: 'Fred Meyer (Online)' },
 ];
 
 function getMonday(d: Date): string {

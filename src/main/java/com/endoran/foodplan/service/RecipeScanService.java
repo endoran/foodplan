@@ -47,12 +47,44 @@ public class RecipeScanService {
             "^[\\p{L}][\\p{L} ]{0,30}$");
 
     private final RecipeImportService recipeImportService;
+    private final OllamaRecipeExtractor ollamaExtractor;
 
-    public RecipeScanService(RecipeImportService recipeImportService) {
+    public RecipeScanService(RecipeImportService recipeImportService,
+                             OllamaRecipeExtractor ollamaExtractor) {
         this.recipeImportService = recipeImportService;
+        this.ollamaExtractor = ollamaExtractor;
     }
 
     public ImportedRecipePreview scanFile(MultipartFile file) {
+        // Tier 1 & 2: Try LLM extraction if Ollama is available
+        if (ollamaExtractor.isAvailable()) {
+            // Tier 1: Vision — send photo directly to vision model
+            try {
+                ImportedRecipePreview vision = ollamaExtractor.extractFromImage(
+                        file.getBytes(), file.getContentType());
+                if (vision != null) {
+                    log.info("Recipe extracted via vision LLM");
+                    return vision;
+                }
+            } catch (Exception e) {
+                log.warn("Vision extraction attempt failed: {}", e.getMessage());
+            }
+
+            // Tier 2: Text LLM — OCR first, then send text to LLM
+            String ocrText = performOcr(file);
+            ImportedRecipePreview textLlm = ollamaExtractor.extractFromText(ocrText);
+            if (textLlm != null) {
+                log.info("Recipe extracted via text LLM (OCR + LLM)");
+                return textLlm;
+            }
+
+            // Tier 3: Regex fallback — reuse OCR text already captured
+            log.info("Recipe extracted via regex fallback");
+            return parseScannedText(ocrText);
+        }
+
+        // Ollama not available — go straight to regex fallback
+        log.info("Ollama unavailable, using regex fallback");
         String text = performOcr(file);
         return parseScannedText(text);
     }

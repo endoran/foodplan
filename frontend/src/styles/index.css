@@ -291,6 +291,10 @@ body {
 }
 .shopping-controls input[type="date"], .shopping-controls select {
   padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.875rem;
+  height: 2.375rem; box-sizing: border-box;
+}
+.shopping-controls .btn {
+  height: 2.375rem; box-sizing: border-box; align-self: flex-end;
 }
 .aisle-header-row td {
   padding-top: 1.25rem; font-size: 1.05rem; border-bottom: 2px solid var(--border);
