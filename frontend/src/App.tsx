@@ -12,6 +12,8 @@ import { IngredientFormPage } from './recipes/IngredientFormPage';
 import { IngredientBulkEditPage } from './recipes/IngredientBulkEditPage';
 import { RecipeImportPage } from './recipes/RecipeImportPage';
 import { RecipeScanPage } from './recipes/RecipeScanPage';
+import { GlobalRecipeBookPage } from './recipes/GlobalRecipeBookPage';
+import { SharedRecipeDetailPage } from './recipes/SharedRecipeDetailPage';
 import { CalendarPage } from './calendar/CalendarPage';
 import { InventoryPage } from './inventory/InventoryPage';
 import { ShoppingListPage } from './inventory/ShoppingListPage';
@@ -29,6 +31,8 @@ export function App() {
             <Route path="/recipes/new" element={<ProtectedRoute><RecipeFormPage /></ProtectedRoute>} />
             <Route path="/recipes/import" element={<ProtectedRoute><RecipeImportPage /></ProtectedRoute>} />
             <Route path="/recipes/scan" element={<ProtectedRoute><RecipeScanPage /></ProtectedRoute>} />
+            <Route path="/recipes/global" element={<ProtectedRoute><GlobalRecipeBookPage /></ProtectedRoute>} />
+            <Route path="/recipes/global/:sharedId" element={<ProtectedRoute><SharedRecipeDetailPage /></ProtectedRoute>} />
             <Route path="/recipes/:id" element={<ProtectedRoute><RecipeDetailPage /></ProtectedRoute>} />
             <Route path="/recipes/:id/edit" element={<ProtectedRoute><RecipeFormPage /></ProtectedRoute>} />
             <Route path="/ingredients" element={<ProtectedRoute><IngredientListPage /></ProtectedRoute>} />
