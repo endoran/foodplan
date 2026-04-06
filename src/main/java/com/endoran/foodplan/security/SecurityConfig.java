@@ -36,6 +36,7 @@ public class SecurityConfig {
                 .securityMatcher(
                         "/api/v1/auth/register", "/api/v1/auth/login",
                         "/api/v1/reference/**",
+                        "/api/v1/global-recipes/status",
                         "/actuator/**",
                         "/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**"
                 )
