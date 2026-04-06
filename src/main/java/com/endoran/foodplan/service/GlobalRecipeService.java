@@ -4,10 +4,16 @@ import com.endoran.foodplan.config.SharedMongoConfig.SharedMongoHolder;
 import com.endoran.foodplan.dto.GlobalRecipeBookStatus;
 import com.endoran.foodplan.dto.PinnedRecipeResponse;
 import com.endoran.foodplan.dto.SharedRecipeIngredientResponse;
+import com.endoran.foodplan.dto.RecipeIngredientRequest;
+import com.endoran.foodplan.dto.RecipeIngredientResponse;
+import com.endoran.foodplan.dto.RecipeResponse;
 import com.endoran.foodplan.dto.SharedRecipeResponse;
 import com.endoran.foodplan.model.PinnedRecipe;
 import com.endoran.foodplan.model.Recipe;
 import com.endoran.foodplan.model.SharedRecipe;
+import com.endoran.foodplan.model.Measurement;
+import com.endoran.foodplan.model.MeasurementUnit;
+import com.endoran.foodplan.model.Recipe;
 import com.endoran.foodplan.model.SharedRecipeIngredient;
 import com.endoran.foodplan.repository.PinnedRecipeRepository;
 import com.endoran.foodplan.repository.RecipeRepository;
@@ -29,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,6 +49,10 @@ public class GlobalRecipeService {
     private final boolean enabled;
     private final String instanceId;
     private final String instanceName;
+
+    // Circuit breaker: skip shared-mongo calls for 60s after a failure
+    private final AtomicLong sharedMongoDownUntil = new AtomicLong(0);
+    private static final long CIRCUIT_BREAKER_MS = 60_000;
 
     public GlobalRecipeService(
             SharedMongoHolder sharedMongoHolder,
@@ -66,10 +77,14 @@ public class GlobalRecipeService {
         if (!isEnabled()) {
             return new GlobalRecipeBookStatus(false, false);
         }
+        if (!isSharedMongoReachable()) {
+            return new GlobalRecipeBookStatus(true, false);
+        }
         try {
             sharedMongo.getDb().runCommand(new org.bson.Document("ping", 1));
             return new GlobalRecipeBookStatus(true, true);
         } catch (Exception e) {
+            markSharedMongoDown();
             log.warn("Shared MongoDB unreachable: {}", e.getMessage());
             return new GlobalRecipeBookStatus(true, false);
         }
@@ -227,14 +242,62 @@ public class GlobalRecipeService {
                 .toList();
     }
 
+    public RecipeResponse copyAsOwn(String orgId, String pinnedId) {
+        PinnedRecipe pin = pinnedRecipeRepository.findByIdAndOrgId(pinnedId, orgId)
+                .orElseThrow(() -> new RecipeNotFoundException("Pinned recipe " + pinnedId));
+
+        Recipe recipe = new Recipe();
+        recipe.setOrgId(orgId);
+        recipe.setName(pin.getName());
+        recipe.setInstructions(pin.getInstructions());
+        recipe.setBaseServings(pin.getBaseServings());
+        recipe.setIngredients(pin.getIngredients().stream()
+                .map(si -> {
+                    var ri = new com.endoran.foodplan.model.RecipeIngredient(
+                            si.getSection(),
+                            null,
+                            si.getIngredientName(),
+                            new Measurement(
+                                    java.math.BigDecimal.valueOf(si.getQuantity()),
+                                    MeasurementUnit.valueOf(si.getUnit())));
+                    return ri;
+                })
+                .toList());
+
+        recipe = recipeRepository.save(recipe);
+        pinnedRecipeRepository.delete(pin);
+        log.info("Copied pinned recipe '{}' as local recipe '{}'", pin.getName(), recipe.getId());
+
+        List<RecipeIngredientResponse> ingredients = recipe.getIngredients().stream()
+                .map(ri -> new RecipeIngredientResponse(
+                        ri.getSection(), ri.getIngredientId(), ri.getIngredientName(),
+                        ri.getMeasurement().getQuantity(), ri.getMeasurement().getUnit()))
+                .toList();
+
+        return new RecipeResponse(
+                recipe.getId(), recipe.getName(), recipe.getInstructions(),
+                recipe.getBaseServings(), recipe.getBaseServings(),
+                ingredients, false);
+    }
+
+    private boolean isSharedMongoReachable() {
+        return System.currentTimeMillis() >= sharedMongoDownUntil.get();
+    }
+
+    private void markSharedMongoDown() {
+        sharedMongoDownUntil.set(System.currentTimeMillis() + CIRCUIT_BREAKER_MS);
+        log.warn("Shared MongoDB circuit breaker open for {}s", CIRCUIT_BREAKER_MS / 1000);
+    }
+
     public boolean isRecipeShared(String orgId, String recipeId) {
-        if (!isEnabled()) return false;
+        if (!isEnabled() || !isSharedMongoReachable()) return false;
         try {
             Query query = Query.query(Criteria.where("sourceInstanceId").is(instanceId)
                     .and("sourceRecipeId").is(recipeId)
                     .and("sourceOrgId").is(orgId));
             return sharedMongo.exists(query, SharedRecipe.class);
         } catch (Exception e) {
+            markSharedMongoDown();
             return false;
         }
     }

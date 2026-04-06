@@ -2,6 +2,7 @@ package com.endoran.foodplan.controller;
 
 import com.endoran.foodplan.dto.GlobalRecipeBookStatus;
 import com.endoran.foodplan.dto.PinnedRecipeResponse;
+import com.endoran.foodplan.dto.RecipeResponse;
 import com.endoran.foodplan.dto.SharedRecipeResponse;
 import com.endoran.foodplan.dto.WebRecipeSearchResult;
 import com.endoran.foodplan.service.GlobalRecipeService;
@@ -112,6 +113,15 @@ public class GlobalRecipeController {
         checkEnabled();
         String orgId = jwt.getClaimAsString("orgId");
         return ResponseEntity.ok(globalRecipeService.acceptUpdate(orgId, pinnedId));
+    }
+
+    @PostMapping("/pin/{pinnedId}/copy")
+    public ResponseEntity<RecipeResponse> copyAsOwn(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String pinnedId) {
+        checkEnabled();
+        String orgId = jwt.getClaimAsString("orgId");
+        return ResponseEntity.ok(globalRecipeService.copyAsOwn(orgId, pinnedId));
     }
 
     @GetMapping("/pins")
