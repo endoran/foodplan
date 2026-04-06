@@ -12,6 +12,7 @@ export function RecipeListPage() {
   const [globalStatus, setGlobalStatus] = useState<GlobalBookStatus | null>(null);
   const [pins, setPins] = useState<PinnedRecipe[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [confirmUnpin, setConfirmUnpin] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -56,21 +57,17 @@ export function RecipeListPage() {
     try {
       await copyPinnedAsOwn(pinnedId);
       await Promise.all([loadRecipes(search || undefined), loadPins()]);
-    } catch (err: any) {
-      alert(err.message || 'Failed to copy recipe');
     } finally {
       setBusy(null);
     }
   };
 
   const handleUnpin = async (pinnedId: string) => {
-    if (!confirm('Unpin this recipe?')) return;
     setBusy(pinnedId);
+    setConfirmUnpin(null);
     try {
       await unpinRecipe(pinnedId);
       await loadPins();
-    } catch (err: any) {
-      alert(err.message || 'Failed to unpin');
     } finally {
       setBusy(null);
     }
@@ -81,8 +78,6 @@ export function RecipeListPage() {
     try {
       await acceptPinUpdate(pinnedId);
       await loadPins();
-    } catch (err: any) {
-      alert(err.message || 'Failed to accept update');
     } finally {
       setBusy(null);
     }
@@ -90,7 +85,6 @@ export function RecipeListPage() {
 
   const globalEnabled = globalStatus?.enabled ?? false;
 
-  // Filter pinned recipes by search term (client-side)
   const filteredPins = search
     ? pins.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
     : pins;
@@ -155,31 +149,56 @@ export function RecipeListPage() {
               <p className="muted">
                 {pin.ingredients.length} ingredient{pin.ingredients.length !== 1 ? 's' : ''}
               </p>
-              <div className="btn-group" style={{ marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                <button
-                  className="btn btn-small btn-primary"
-                  disabled={busy === pin.id}
-                  onClick={() => handleCopyAsOwn(pin.id)}
-                >
-                  {busy === pin.id ? '...' : 'Copy as My Own'}
-                </button>
-                {pin.hasUpdate && (
+              {confirmUnpin === pin.id ? (
+                <div style={{
+                  marginTop: '0.5rem', padding: '0.5rem',
+                  background: 'var(--surface)', borderRadius: 'var(--radius)',
+                  border: '1px solid var(--border)',
+                }}>
+                  <p style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>Remove from your recipes?</p>
+                  <div className="btn-group">
+                    <button
+                      className="btn btn-small btn-danger"
+                      disabled={busy === pin.id}
+                      onClick={() => handleUnpin(pin.id)}
+                    >
+                      {busy === pin.id ? '...' : 'Yes, Unpin'}
+                    </button>
+                    <button
+                      className="btn btn-small"
+                      onClick={() => setConfirmUnpin(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="btn-group" style={{ marginTop: '0.5rem', flexWrap: 'wrap' }}>
                   <button
-                    className="btn btn-small"
+                    className="btn btn-small btn-primary"
                     disabled={busy === pin.id}
-                    onClick={() => handleAcceptUpdate(pin.id)}
+                    onClick={() => handleCopyAsOwn(pin.id)}
                   >
-                    Accept Update
+                    {busy === pin.id ? '...' : 'Copy as My Own'}
                   </button>
-                )}
-                <button
-                  className="btn btn-small btn-danger"
-                  disabled={busy === pin.id}
-                  onClick={() => handleUnpin(pin.id)}
-                >
-                  Unpin
-                </button>
-              </div>
+                  {pin.hasUpdate && (
+                    <button
+                      className="btn btn-small"
+                      disabled={busy === pin.id}
+                      onClick={() => handleAcceptUpdate(pin.id)}
+                    >
+                      Accept Update
+                    </button>
+                  )}
+                  <button
+                    className="btn btn-small btn-danger"
+                    disabled={busy === pin.id}
+                    onClick={() => setConfirmUnpin(pin.id)}
+                  >
+                    Unpin
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

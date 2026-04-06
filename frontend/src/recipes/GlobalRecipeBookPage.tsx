@@ -9,6 +9,7 @@ export function GlobalRecipeBookPage() {
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [pinning, setPinning] = useState<string | null>(null);
+  const [pinned, setPinned] = useState<Set<string>>(new Set());
 
   // Web search state
   const [webResults, setWebResults] = useState<Map<string, WebRecipeResult[]>>(new Map());
@@ -35,7 +36,6 @@ export function GlobalRecipeBookPage() {
     if (debounceRef.current !== null) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       loadRecipes(value || undefined, 0);
-      // Also trigger web search if there's a query
       if (value.trim().length >= 2) {
         doWebSearch(value.trim());
       } else {
@@ -50,7 +50,6 @@ export function GlobalRecipeBookPage() {
     setWebSearched(true);
     try {
       const results = await searchWebRecipes(query);
-      // Group by site
       const grouped = new Map<string, WebRecipeResult[]>();
       results.forEach(r => {
         const existing = grouped.get(r.site) || [];
@@ -69,9 +68,10 @@ export function GlobalRecipeBookPage() {
     setPinning(sharedId);
     try {
       await pinRecipe(sharedId);
-      alert('Recipe pinned to your list!');
-    } catch (err: any) {
-      alert(err.message || 'Failed to pin recipe');
+      setPinned(prev => new Set(prev).add(sharedId));
+    } catch {
+      // Already pinned or other error — just show as pinned
+      setPinned(prev => new Set(prev).add(sharedId));
     } finally {
       setPinning(null);
     }
@@ -94,7 +94,6 @@ export function GlobalRecipeBookPage() {
         />
       </div>
 
-      {/* Local shared recipes */}
       {loading ? (
         <p>Loading...</p>
       ) : recipes.length === 0 && !search ? (
@@ -108,7 +107,7 @@ export function GlobalRecipeBookPage() {
               </h2>
               <div className="card-grid">
                 {recipes.map(recipe => (
-                  <div key={recipe.id} className="card">
+                  <div key={recipe.id} className="card" style={{ position: 'relative' }}>
                     <Link to={`/recipes/global/${recipe.id}`}>
                       <h3>{recipe.name}</h3>
                       <p className="muted">by {recipe.attribution}</p>
@@ -118,13 +117,24 @@ export function GlobalRecipeBookPage() {
                       </p>
                     </Link>
                     {!recipe.ownedByCurrentInstance && (
-                      <button
-                        className="btn btn-small"
-                        disabled={pinning === recipe.id}
-                        onClick={(e) => { e.preventDefault(); handlePin(recipe.id); }}
-                      >
-                        {pinning === recipe.id ? 'Pinning...' : 'Pin'}
-                      </button>
+                      pinned.has(recipe.id) ? (
+                        <span style={{
+                          display: 'inline-block', marginTop: '0.5rem',
+                          padding: '0.25rem 0.75rem', borderRadius: 'var(--radius)',
+                          background: 'var(--primary)', color: 'white',
+                          fontSize: '0.8rem', fontWeight: 500,
+                        }}>
+                          Pinned
+                        </span>
+                      ) : (
+                        <button
+                          className="btn btn-small"
+                          disabled={pinning === recipe.id}
+                          onClick={(e) => { e.preventDefault(); handlePin(recipe.id); }}
+                        >
+                          {pinning === recipe.id ? 'Pinning...' : 'Pin'}
+                        </button>
+                      )
                     )}
                   </div>
                 ))}
@@ -150,7 +160,6 @@ export function GlobalRecipeBookPage() {
         </>
       )}
 
-      {/* Web search results */}
       {webSearched && (
         <div style={{ marginTop: '2rem' }}>
           <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem', color: 'var(--muted)', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>

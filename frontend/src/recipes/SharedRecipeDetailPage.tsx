@@ -8,6 +8,7 @@ export function SharedRecipeDetailPage() {
   const [recipe, setRecipe] = useState<SharedRecipe | null>(null);
   const [loading, setLoading] = useState(true);
   const [pinning, setPinning] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
 
   useEffect(() => { loadRecipe(); }, [sharedId]);
 
@@ -25,9 +26,10 @@ export function SharedRecipeDetailPage() {
     setPinning(true);
     try {
       await pinRecipe(sharedId!);
-      alert('Recipe pinned to your list!');
-    } catch (err: any) {
-      alert(err.message || 'Failed to pin recipe');
+      setIsPinned(true);
+    } catch {
+      // Already pinned or other error — show as pinned
+      setIsPinned(true);
     } finally {
       setPinning(false);
     }
@@ -36,7 +38,6 @@ export function SharedRecipeDetailPage() {
   if (loading && !recipe) return <p>Loading...</p>;
   if (!recipe) return <p>Shared recipe not found.</p>;
 
-  // Group ingredients by section
   const groups: { section: string | null; items: typeof recipe.ingredients }[] = [];
   recipe.ingredients.forEach((ing) => {
     const last = groups[groups.length - 1];
@@ -56,9 +57,20 @@ export function SharedRecipeDetailPage() {
         </div>
         <div className="btn-group">
           {!recipe.ownedByCurrentInstance && (
-            <button className="btn btn-primary" disabled={pinning} onClick={handlePin}>
-              {pinning ? 'Pinning...' : 'Pin to My Recipes'}
-            </button>
+            isPinned ? (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center',
+                padding: '0.5rem 1rem', borderRadius: 'var(--radius)',
+                background: 'var(--primary)', color: 'white',
+                fontSize: '0.9rem', fontWeight: 500,
+              }}>
+                Pinned
+              </span>
+            ) : (
+              <button className="btn btn-primary" disabled={pinning} onClick={handlePin}>
+                {pinning ? 'Pinning...' : 'Pin to My Recipes'}
+              </button>
+            )
           )}
         </div>
       </div>
