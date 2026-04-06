@@ -39,3 +39,10 @@ export interface GlobalBookStatus {
   enabled: boolean;
   reachable: boolean;
 }
+
+export interface WebRecipeResult {
+  title: string;
+  url: string;
+  snippet: string;
+  site: string;
+}

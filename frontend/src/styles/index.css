@@ -94,7 +94,20 @@ body {
   border-radius: var(--radius);
   font-size: 0.875rem;
 }
-.auth-form button { margin-top: 0.5rem; }
+.auth-form button {
+  margin-top: 0.5rem;
+  padding: 0.625rem 1rem;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+}
+.auth-form button:hover { background: var(--primary-hover); }
+.auth-form button:disabled { opacity: 0.5; cursor: not-allowed; }
 .auth-link { margin-top: 1rem; text-align: center; font-size: 0.875rem; color: var(--muted); }
 .auth-link a { color: var(--primary); }
 

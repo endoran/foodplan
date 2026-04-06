@@ -3,8 +3,10 @@ package com.endoran.foodplan.controller;
 import com.endoran.foodplan.dto.GlobalRecipeBookStatus;
 import com.endoran.foodplan.dto.PinnedRecipeResponse;
 import com.endoran.foodplan.dto.SharedRecipeResponse;
+import com.endoran.foodplan.dto.WebRecipeSearchResult;
 import com.endoran.foodplan.service.GlobalRecipeService;
 import com.endoran.foodplan.service.RecipeNotFoundException;
+import com.endoran.foodplan.service.WebRecipeSearchService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,9 +21,12 @@ import java.util.Map;
 public class GlobalRecipeController {
 
     private final GlobalRecipeService globalRecipeService;
+    private final WebRecipeSearchService webRecipeSearchService;
 
-    public GlobalRecipeController(GlobalRecipeService globalRecipeService) {
+    public GlobalRecipeController(GlobalRecipeService globalRecipeService,
+                                  WebRecipeSearchService webRecipeSearchService) {
         this.globalRecipeService = globalRecipeService;
+        this.webRecipeSearchService = webRecipeSearchService;
     }
 
     @GetMapping("/status")
@@ -63,6 +68,16 @@ public class GlobalRecipeController {
             @RequestParam(defaultValue = "20") int size) {
         checkEnabled();
         return ResponseEntity.ok(globalRecipeService.browse(search, page, size));
+    }
+
+    @GetMapping("/web-search")
+    public ResponseEntity<List<WebRecipeSearchResult>> webSearch(
+            @RequestParam("q") String query) {
+        checkEnabled();
+        if (query == null || query.isBlank() || query.length() < 2) {
+            return ResponseEntity.ok(List.of());
+        }
+        return ResponseEntity.ok(webRecipeSearchService.search(query));
     }
 
     @GetMapping("/{sharedId}")

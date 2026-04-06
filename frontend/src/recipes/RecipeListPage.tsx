@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { apiGet } from '../api/client';
 import { getGlobalBookStatus, getMyPins } from '../api/globalRecipes';
@@ -16,6 +16,7 @@ export function RecipeListPage() {
   const [globalStatus, setGlobalStatus] = useState<GlobalBookStatus | null>(null);
   const [pins, setPins] = useState<PinnedRecipe[]>([]);
   const [pinsLoading, setPinsLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     loadRecipes();
@@ -48,9 +49,12 @@ export function RecipeListPage() {
     }
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    loadRecipes(search || undefined);
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      loadRecipes(value || undefined);
+    }, 300);
   };
 
   const updateCount = pins.filter(p => p.hasUpdate).length;
@@ -97,15 +101,14 @@ export function RecipeListPage() {
 
       {tab === 'mine' && (
         <>
-          <form onSubmit={handleSearch} className="search-bar">
+          <div className="search-bar">
             <input
               type="text"
               placeholder="Search recipes..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => handleSearchChange(e.target.value)}
             />
-            <button type="submit">Search</button>
-          </form>
+          </div>
           {loading ? (
             <p>Loading...</p>
           ) : recipes.length === 0 ? (

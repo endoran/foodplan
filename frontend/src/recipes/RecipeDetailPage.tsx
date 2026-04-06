@@ -50,7 +50,10 @@ export function RecipeDetailPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>{recipe.name}</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Link to="/recipes" className="btn btn-small">&larr; Back</Link>
+          <h1>{recipe.name}</h1>
+        </div>
         <div className="btn-group">
           {globalEnabled && (
             <ShareRecipeButton recipeId={id!} initialShared={recipe.shared ?? false} />
@@ -115,8 +118,6 @@ export function RecipeDetailPage() {
           })()
         )}
       </div>
-
-      <Link to="/recipes" className="btn">Back to Recipes</Link>
     </div>
   );
 }

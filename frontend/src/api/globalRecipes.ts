@@ -1,5 +1,5 @@
 import { apiGet, apiPost, apiDelete } from './client';
-import type { GlobalBookStatus, SharedRecipe, PinnedRecipe } from '../recipes/global-types';
+import type { GlobalBookStatus, SharedRecipe, PinnedRecipe, WebRecipeResult } from '../recipes/global-types';
 
 export function getGlobalBookStatus(): Promise<GlobalBookStatus> {
   return apiGet('/api/v1/global-recipes/status');
@@ -43,4 +43,8 @@ export function acceptPinUpdate(pinnedId: string): Promise<PinnedRecipe> {
 
 export function getMyPins(): Promise<PinnedRecipe[]> {
   return apiGet('/api/v1/global-recipes/pins');
+}
+
+export function searchWebRecipes(query: string): Promise<WebRecipeResult[]> {
+  return apiGet('/api/v1/global-recipes/web-search?q=' + encodeURIComponent(query));
 }
