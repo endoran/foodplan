@@ -1,5 +1,6 @@
 package com.endoran.foodplan.service;
 
+import com.endoran.foodplan.config.SharedMongoConfig.SharedMongoHolder;
 import com.endoran.foodplan.dto.GlobalRecipeBookStatus;
 import com.endoran.foodplan.dto.PinnedRecipeResponse;
 import com.endoran.foodplan.dto.SharedRecipeIngredientResponse;
@@ -12,7 +13,6 @@ import com.endoran.foodplan.repository.PinnedRecipeRepository;
 import com.endoran.foodplan.repository.RecipeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
@@ -23,6 +23,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -43,13 +44,13 @@ public class GlobalRecipeService {
     private final String instanceName;
 
     public GlobalRecipeService(
-            @Autowired(required = false) @Qualifier("sharedMongoTemplate") MongoTemplate sharedMongo,
+            SharedMongoHolder sharedMongoHolder,
             PinnedRecipeRepository pinnedRecipeRepository,
             RecipeRepository recipeRepository,
             @Qualifier("globalRecipeBookEnabled") boolean enabled,
             @Value("${foodplan.instance.id:}") String instanceId,
             @Value("${foodplan.instance.name:}") String instanceName) {
-        this.sharedMongo = sharedMongo;
+        this.sharedMongo = sharedMongoHolder.getTemplate();
         this.pinnedRecipeRepository = pinnedRecipeRepository;
         this.recipeRepository = recipeRepository;
         this.enabled = enabled;
@@ -154,7 +155,6 @@ public class GlobalRecipeService {
     }
 
     public PinnedRecipeResponse pin(String orgId, String sharedId) {
-        // Check for duplicate pin
         pinnedRecipeRepository.findByOrgIdAndSharedRecipeId(orgId, sharedId)
                 .ifPresent(p -> {
                     throw new IllegalStateException("Recipe already pinned");
@@ -172,7 +172,7 @@ public class GlobalRecipeService {
         pin.setName(shared.getName());
         pin.setInstructions(shared.getInstructions());
         pin.setBaseServings(shared.getBaseServings());
-        pin.setIngredients(new java.util.ArrayList<>(shared.getIngredients()));
+        pin.setIngredients(new ArrayList<>(shared.getIngredients()));
         pin.setSourceInstanceName(shared.getSourceInstanceName());
         pin.setAttribution(shared.getAttribution());
         pin.setPinnedAt(Instant.now());
@@ -202,7 +202,7 @@ public class GlobalRecipeService {
         pin.setName(shared.getName());
         pin.setInstructions(shared.getInstructions());
         pin.setBaseServings(shared.getBaseServings());
-        pin.setIngredients(new java.util.ArrayList<>(shared.getIngredients()));
+        pin.setIngredients(new ArrayList<>(shared.getIngredients()));
 
         pin = pinnedRecipeRepository.save(pin);
         log.info("Accepted update for pinned recipe '{}' (now version {})", pin.getName(), pin.getPinnedVersion());
@@ -215,7 +215,6 @@ public class GlobalRecipeService {
             return Collections.emptyList();
         }
 
-        // Batch-fetch current versions from central DB
         Map<String, SharedRecipe> sharedVersions = fetchSharedVersions(pins);
 
         return pins.stream()
@@ -223,7 +222,6 @@ public class GlobalRecipeService {
                     SharedRecipe shared = sharedVersions.get(pin.getSharedRecipeId());
                     boolean sourceRemoved = shared == null;
                     Integer latestVersion = shared != null ? shared.getVersion() : null;
-                    boolean hasUpdate = !sourceRemoved && shared.getVersion() > pin.getPinnedVersion();
                     return toPinnedResponse(pin, latestVersion, sourceRemoved);
                 })
                 .toList();
