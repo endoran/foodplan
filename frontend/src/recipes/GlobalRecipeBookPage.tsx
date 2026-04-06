@@ -15,7 +15,7 @@ export function GlobalRecipeBookPage() {
   const [webLoading, setWebLoading] = useState(false);
   const [webSearched, setWebSearched] = useState(false);
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { loadRecipes(); }, []);
 
@@ -32,7 +32,7 @@ export function GlobalRecipeBookPage() {
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (debounceRef.current !== null) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       loadRecipes(value || undefined, 0);
       // Also trigger web search if there's a query

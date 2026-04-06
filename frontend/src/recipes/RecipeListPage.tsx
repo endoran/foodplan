@@ -16,7 +16,7 @@ export function RecipeListPage() {
   const [globalStatus, setGlobalStatus] = useState<GlobalBookStatus | null>(null);
   const [pins, setPins] = useState<PinnedRecipe[]>([]);
   const [pinsLoading, setPinsLoading] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     loadRecipes();
@@ -51,7 +51,7 @@ export function RecipeListPage() {
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (debounceRef.current !== null) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       loadRecipes(value || undefined);
     }, 300);
