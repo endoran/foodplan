@@ -32,4 +32,5 @@ export interface DropData {
   recipeId: string;
   recipeName: string;
   entryId?: string; // present = move existing meal, absent = new recipe from sidebar
+  pinnedId?: string; // present = pinned recipe, needs copy-as-own before adding to meal plan
 }

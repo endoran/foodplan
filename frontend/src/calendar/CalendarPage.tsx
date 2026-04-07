@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { apiGet, apiPost, apiPut } from '../api/client';
+import { copyPinnedAsOwn } from '../api/globalRecipes';
 import { MealPlanEntry, CalendarView, DropData, CreateMealPlanRequest, MealType } from './types';
 import { RecipeSidebar } from './RecipeSidebar';
 import { WeekView } from './WeekView';
@@ -32,6 +33,7 @@ export function CalendarPage() {
   const [entries, setEntries] = useState<MealPlanEntry[]>([]);
   const [pendingDrop, setPendingDrop] = useState<{ date: Date; data: DropData } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [copying, setCopying] = useState(false);
 
   const getDateRange = useCallback((): { from: string; to: string } => {
     if (view === 'week') {
@@ -102,8 +104,21 @@ export function CalendarPage() {
         handleMealChange();
       }
     } else {
-      // New recipe from sidebar
-      setPendingDrop({ date, data });
+      // New recipe from sidebar — if pinned, resolve to local recipe first
+      if (data.pinnedId) {
+        setCopying(true);
+        try {
+          const localRecipe = await copyPinnedAsOwn(data.pinnedId);
+          setPendingDrop({
+            date,
+            data: { recipeId: localRecipe.id, recipeName: localRecipe.name },
+          });
+        } finally {
+          setCopying(false);
+        }
+      } else {
+        setPendingDrop({ date, data });
+      }
     }
   };
 
@@ -151,6 +166,12 @@ export function CalendarPage() {
         <span className="calendar-title">{getTitle()}</span>
         <button className="btn btn-small" onClick={handleNext}>Next &rsaquo;</button>
       </div>
+
+      {copying && (
+        <p style={{ textAlign: 'center', color: 'var(--primary)', fontSize: '0.9rem' }}>
+          Copying pinned recipe to your recipes...
+        </p>
+      )}
 
       <div className="calendar-layout">
         <RecipeSidebar />

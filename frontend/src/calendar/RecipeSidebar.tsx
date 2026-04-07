@@ -1,24 +1,65 @@
 import { useEffect, useState } from 'react';
 import { apiGet } from '../api/client';
+import { getGlobalBookStatus, getMyPins } from '../api/globalRecipes';
 import { Recipe } from '../recipes/types';
+import type { PinnedRecipe } from '../recipes/global-types';
+
+interface SidebarItem {
+  id: string;
+  name: string;
+  pinnedId?: string; // set for pinned recipes
+}
 
 export function RecipeSidebar() {
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [items, setItems] = useState<SidebarItem[]>([]);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    apiGet<Recipe[]>('/api/v1/recipes').then(setRecipes);
+    const loadAll = async () => {
+      const recipesPromise = apiGet<Recipe[]>('/api/v1/recipes');
+      let pinsPromise: Promise<PinnedRecipe[]> = Promise.resolve([]);
+
+      try {
+        const status = await getGlobalBookStatus();
+        if (status.enabled) {
+          pinsPromise = getMyPins();
+        }
+      } catch {
+        // global book not available
+      }
+
+      const [recipes, pins] = await Promise.all([recipesPromise, pinsPromise]);
+
+      const recipeItems: SidebarItem[] = recipes.map(r => ({
+        id: r.id,
+        name: r.name,
+      }));
+
+      const pinItems: SidebarItem[] = pins.map(p => ({
+        id: p.sharedRecipeId,
+        name: p.name,
+        pinnedId: p.id,
+      }));
+
+      setItems([...recipeItems, ...pinItems]);
+    };
+
+    loadAll();
   }, []);
 
-  const filtered = recipes.filter(r =>
+  const filtered = items.filter(r =>
     r.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleDragStart = (e: React.DragEvent, recipe: Recipe) => {
-    e.dataTransfer.setData('application/json', JSON.stringify({
-      recipeId: recipe.id,
-      recipeName: recipe.name,
-    }));
+  const handleDragStart = (e: React.DragEvent, item: SidebarItem) => {
+    const data: Record<string, string> = {
+      recipeId: item.id,
+      recipeName: item.name,
+    };
+    if (item.pinnedId) {
+      data.pinnedId = item.pinnedId;
+    }
+    e.dataTransfer.setData('application/json', JSON.stringify(data));
     e.dataTransfer.effectAllowed = 'copy';
   };
 
@@ -33,14 +74,22 @@ export function RecipeSidebar() {
         className="sidebar-search"
       />
       <div className="sidebar-list">
-        {filtered.map(recipe => (
+        {filtered.map(item => (
           <div
-            key={recipe.id}
+            key={item.pinnedId ? `pin-${item.pinnedId}` : item.id}
             className="sidebar-recipe"
             draggable
-            onDragStart={e => handleDragStart(e, recipe)}
+            onDragStart={e => handleDragStart(e, item)}
           >
-            {recipe.name}
+            {item.name}
+            {item.pinnedId && (
+              <span style={{
+                fontSize: '0.65rem', color: 'var(--primary)', fontWeight: 500,
+                marginLeft: '0.35rem',
+              }}>
+                (pinned)
+              </span>
+            )}
           </div>
         ))}
         {filtered.length === 0 && <p className="muted">No recipes found</p>}
