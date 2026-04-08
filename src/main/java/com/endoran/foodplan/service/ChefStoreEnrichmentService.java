@@ -14,6 +14,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,7 @@ import java.util.Map;
 public class ChefStoreEnrichmentService implements StoreEnrichmentService {
 
     private static final Logger log = LoggerFactory.getLogger(ChefStoreEnrichmentService.class);
+    private static final int MAX_ALTERNATIVES = 8;
 
     private final String appId;
     private final String apiKey;
@@ -49,13 +51,13 @@ public class ChefStoreEnrichmentService implements StoreEnrichmentService {
     }
 
     @Override
-    public Map<String, StoreProductMatch> enrich(List<String> ingredientNames) {
-        Map<String, StoreProductMatch> results = new HashMap<>();
+    public Map<String, List<StoreProductMatch>> enrich(List<String> ingredientNames) {
+        Map<String, List<StoreProductMatch>> results = new HashMap<>();
         for (String name : ingredientNames) {
             try {
-                StoreProductMatch match = searchProduct(name);
-                if (match != null) {
-                    results.put(name, match);
+                List<StoreProductMatch> matches = searchProducts(name);
+                if (!matches.isEmpty()) {
+                    results.put(name, matches);
                 }
             } catch (Exception e) {
                 log.warn("CHEF'STORE lookup failed for '{}': {}", name, e.getMessage());
@@ -64,11 +66,11 @@ public class ChefStoreEnrichmentService implements StoreEnrichmentService {
         return results;
     }
 
-    private StoreProductMatch searchProduct(String query) throws Exception {
+    private List<StoreProductMatch> searchProducts(String query) throws Exception {
         String endpoint = "https://" + appId + "-dsn.algolia.net/1/indexes/prod_centralia_products/query";
         String body = objectMapper.writeValueAsString(Map.of(
                 "query", query,
-                "hitsPerPage", 3
+                "hitsPerPage", 10
         ));
 
         HttpRequest request = HttpRequest.newBuilder()
@@ -83,17 +85,21 @@ public class ChefStoreEnrichmentService implements StoreEnrichmentService {
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
             log.warn("CHEF'STORE Algolia returned {}", response.statusCode());
-            return null;
+            return List.of();
         }
 
         JsonNode root = objectMapper.readTree(response.body());
         JsonNode hits = root.get("hits");
-        if (hits == null || hits.isEmpty()) return null;
+        if (hits == null || hits.isEmpty()) return List.of();
 
+        List<StoreProductMatch> matches = new ArrayList<>();
         for (JsonNode hit : hits) {
+            if (matches.size() >= MAX_ALTERNATIVES) break;
+
             String exists = getStoreField(hit, "itemExists");
             if (!"1".equals(exists)) continue;
 
+            String productId = hit.has("objectID") ? hit.get("objectID").asText() : null;
             String productName = hit.has("itemDesc1") ? hit.get("itemDesc1").asText() : null;
             String priceStr = getStoreField(hit, "unitSellPrice");
             String regPriceStr = getStoreField(hit, "unitRegPrice");
@@ -104,7 +110,6 @@ public class ChefStoreEnrichmentService implements StoreEnrichmentService {
             BigDecimal price = parsePrice(priceStr);
             BigDecimal regPrice = parsePrice(regPriceStr);
 
-            // If sell price differs from regular price, regular is the "promo" baseline
             BigDecimal promoPrice = null;
             if (price != null && regPrice != null && price.compareTo(regPrice) < 0) {
                 promoPrice = price;
@@ -114,10 +119,10 @@ public class ChefStoreEnrichmentService implements StoreEnrichmentService {
             String stockLevel = "HIGH";
             if ("1".equals(lowStock)) stockLevel = "LOW";
 
-            return new StoreProductMatch(area, price, promoPrice, stockLevel, productName, itemSize);
+            matches.add(new StoreProductMatch(productId, area, price, promoPrice, stockLevel, productName, itemSize));
         }
 
-        return null;
+        return matches;
     }
 
     private String getStoreField(JsonNode hit, String fieldName) {

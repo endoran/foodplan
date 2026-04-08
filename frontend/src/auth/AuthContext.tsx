@@ -48,6 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setToken(null);
     setUser(null);
+    sessionStorage.removeItem('selectedStore');
+    localStorage.removeItem('preferredStore');
   };
 
   return (

@@ -34,8 +34,21 @@ export function pinRecipe(sharedId: string): Promise<PinnedRecipe> {
   return apiPost('/api/v1/global-recipes/' + sharedId + '/pin', {});
 }
 
-export function unpinRecipe(pinnedId: string): Promise<void> {
-  return apiDelete('/api/v1/global-recipes/pin/' + pinnedId);
+export async function unpinRecipe(pinnedId: string, cascade = false): Promise<{ conflict?: boolean; calendarEntryCount?: number }> {
+  const url = '/api/v1/global-recipes/pin/' + pinnedId + (cascade ? '?cascade=true' : '');
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': 'Bearer ' + localStorage.getItem('token'),
+      'Content-Type': 'application/json',
+    },
+  });
+  if (res.status === 409) {
+    const data = await res.json();
+    return { conflict: true, calendarEntryCount: data.calendarEntryCount };
+  }
+  if (!res.ok) throw new Error('Failed to unpin');
+  return {};
 }
 
 export function acceptPinUpdate(pinnedId: string): Promise<PinnedRecipe> {

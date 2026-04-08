@@ -17,4 +17,8 @@ public interface MealPlanEntryRepository extends MongoRepository<MealPlanEntry, 
 
     @Query("{ 'orgId': ?0, 'date': { $gte: ?1, $lte: ?2 }, 'mealType': ?3 }")
     List<MealPlanEntry> findByOrgIdAndDateRangeAndMealType(String orgId, LocalDate from, LocalDate to, MealType mealType);
+
+    List<MealPlanEntry> findByOrgIdAndPinnedId(String orgId, String pinnedId);
+
+    void deleteByOrgIdAndPinnedId(String orgId, String pinnedId);
 }

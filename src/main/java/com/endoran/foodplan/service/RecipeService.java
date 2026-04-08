@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class RecipeService {
@@ -137,6 +138,41 @@ public class RecipeService {
                 scaledQuantity,
                 ri.getMeasurement().getUnit()
         );
+    }
+
+    public Map<String, Integer> backfillIngredients(String orgId) {
+        List<Recipe> recipes = recipeRepository.findByOrgId(orgId);
+        int recipesFixed = 0;
+        int ingredientsCreated = 0;
+        for (Recipe recipe : recipes) {
+            boolean changed = false;
+            for (RecipeIngredient ri : recipe.getIngredients()) {
+                if (ri.getIngredientId() != null && !ri.getIngredientId().isBlank()) continue;
+                var existing = ingredientRepository.findByOrgIdAndNameIgnoreCase(orgId, ri.getIngredientName());
+                if (existing.isPresent()) {
+                    ri.setIngredientId(existing.get().getId());
+                    changed = true;
+                } else {
+                    IngredientCategoryInference.InferredCategories inferred =
+                            IngredientCategoryInference.infer(ri.getIngredientName());
+                    Ingredient newIng = new Ingredient();
+                    newIng.setOrgId(orgId);
+                    newIng.setName(ri.getIngredientName());
+                    newIng.setStorageCategory(inferred.storage());
+                    newIng.setGroceryCategory(inferred.grocery());
+                    newIng.setNeedsReview(true);
+                    newIng = ingredientRepository.save(newIng);
+                    ri.setIngredientId(newIng.getId());
+                    ingredientsCreated++;
+                    changed = true;
+                }
+            }
+            if (changed) {
+                recipeRepository.save(recipe);
+                recipesFixed++;
+            }
+        }
+        return Map.of("recipesFixed", recipesFixed, "ingredientsCreated", ingredientsCreated);
     }
 
     private void autoCreateIngredients(String orgId, List<RecipeIngredient> ingredients) {

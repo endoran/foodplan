@@ -3,6 +3,7 @@ package com.endoran.foodplan.service;
 import com.endoran.foodplan.dto.ShoppingAisle;
 import com.endoran.foodplan.dto.ShoppingItem;
 import com.endoran.foodplan.dto.ShoppingListResponse;
+import com.endoran.foodplan.dto.StoreProductAlternative;
 import com.endoran.foodplan.dto.StoreProductMatch;
 import com.endoran.foodplan.model.Measurement;
 import com.endoran.foodplan.model.MeasurementUnit;
@@ -13,6 +14,8 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -51,22 +54,23 @@ public class StoreEnrichmentOrchestrator {
                     .map(ShoppingItem::ingredientName)
                     .toList();
 
-            Map<String, StoreProductMatch> matches = service.enrich(names);
+            Map<String, List<StoreProductMatch>> allMatches = service.enrich(names);
 
-            Map<String, StoreProductMatch> finalMatches;
+            // Apply fulfillment filtering to each match list
+            Map<String, List<StoreProductMatch>> filteredMatches;
             if (isInStore) {
-                finalMatches = stripFulfillmentAisles(matches);
+                filteredMatches = filterMatchesInStore(allMatches);
             } else if (isOnlineOnly) {
-                finalMatches = keepOnlyFulfillmentItems(matches);
+                filteredMatches = filterMatchesOnlineOnly(allMatches);
             } else {
-                finalMatches = matches;
+                filteredMatches = allMatches;
             }
 
             List<ShoppingAisle> enrichedAisles = baseList.aisles().stream()
                     .map(aisle -> new ShoppingAisle(
                             aisle.category(),
                             aisle.items().stream()
-                                    .map(item -> applyMatch(item, finalMatches.get(item.ingredientName())))
+                                    .map(item -> applyMatches(item, filteredMatches.get(item.ingredientName())))
                                     .toList()
                     ))
                     .toList();
@@ -80,34 +84,29 @@ public class StoreEnrichmentOrchestrator {
         }
     }
 
-    /**
-     * In-store mode: keep all items but null out aisle for fulfillment-only locations (>= 100).
-     */
-    private Map<String, StoreProductMatch> stripFulfillmentAisles(Map<String, StoreProductMatch> matches) {
-        Map<String, StoreProductMatch> filtered = new java.util.HashMap<>();
+    private Map<String, List<StoreProductMatch>> filterMatchesInStore(Map<String, List<StoreProductMatch>> matches) {
+        Map<String, List<StoreProductMatch>> filtered = new HashMap<>();
         for (var entry : matches.entrySet()) {
-            StoreProductMatch match = entry.getValue();
-            if (isFulfillmentAisle(match.storeAisle())) {
-                filtered.put(entry.getKey(), new StoreProductMatch(
-                        null, match.storePrice(), match.storePromoPrice(),
-                        match.storeStockLevel(), match.storeProductName(), match.storePackageSize()));
-            } else {
-                filtered.put(entry.getKey(), match);
-            }
+            List<StoreProductMatch> list = entry.getValue().stream()
+                    .map(m -> isFulfillmentAisle(m.storeAisle())
+                            ? new StoreProductMatch(m.storeProductId(), null, m.storePrice(),
+                                    m.storePromoPrice(), m.storeStockLevel(),
+                                    m.storeProductName(), m.storePackageSize())
+                            : m)
+                    .toList();
+            filtered.put(entry.getKey(), list);
         }
         return filtered;
     }
 
-    /**
-     * Online mode: only keep items that have fulfillment-only aisles (>= 100).
-     * Items available in-store are excluded entirely.
-     */
-    private Map<String, StoreProductMatch> keepOnlyFulfillmentItems(Map<String, StoreProductMatch> matches) {
-        Map<String, StoreProductMatch> filtered = new java.util.HashMap<>();
+    private Map<String, List<StoreProductMatch>> filterMatchesOnlineOnly(Map<String, List<StoreProductMatch>> matches) {
+        Map<String, List<StoreProductMatch>> filtered = new HashMap<>();
         for (var entry : matches.entrySet()) {
-            StoreProductMatch match = entry.getValue();
-            if (isFulfillmentAisle(match.storeAisle())) {
-                filtered.put(entry.getKey(), match);
+            List<StoreProductMatch> list = entry.getValue().stream()
+                    .filter(m -> isFulfillmentAisle(m.storeAisle()))
+                    .toList();
+            if (!list.isEmpty()) {
+                filtered.put(entry.getKey(), list);
             }
         }
         return filtered;
@@ -124,9 +123,28 @@ public class StoreEnrichmentOrchestrator {
         }
     }
 
-    private ShoppingItem applyMatch(ShoppingItem item, StoreProductMatch match) {
-        if (match == null) return item;
+    private ShoppingItem applyMatches(ShoppingItem item, List<StoreProductMatch> matches) {
+        if (matches == null || matches.isEmpty()) return item;
 
+        // Rank by match quality
+        List<StoreProductMatch> ranked = ProductMatchScorer.rankMatches(item.ingredientName(), matches);
+
+        // Build alternatives with pre-computed quantities and totals
+        List<StoreProductAlternative> alternatives = new ArrayList<>();
+        for (StoreProductMatch match : ranked) {
+            alternatives.add(buildAlternative(item, match));
+        }
+
+        return new ShoppingItem(
+                item.ingredientId(),
+                item.ingredientName(),
+                item.quantity(),
+                item.unit(),
+                alternatives
+        );
+    }
+
+    private StoreProductAlternative buildAlternative(ShoppingItem item, StoreProductMatch match) {
         Integer qtyNeeded = null;
         BigDecimal totalPrice = match.storePrice();
         BigDecimal totalPromo = match.storePromoPrice();
@@ -138,8 +156,6 @@ public class StoreEnrichmentOrchestrator {
             UnitConverter.UnitFamily packageFamily = UnitConverter.getFamily(pkgUnit);
             UnitConverter.UnitFamily shoppingFamily = UnitConverter.getFamily(shopUnit);
 
-            // Cross-family bridge: recipe OZ (weight) ↔ store FL_OZ (volume).
-            // 1 oz weight ≈ 1 fl oz volume for dense items — close enough for shopping.
             if (shoppingFamily == UnitConverter.UnitFamily.WEIGHT
                     && shopUnit == MeasurementUnit.OZ
                     && packageFamily == UnitConverter.UnitFamily.VOLUME) {
@@ -147,8 +163,8 @@ public class StoreEnrichmentOrchestrator {
                 shoppingFamily = UnitConverter.UnitFamily.VOLUME;
             }
 
-            if (packageFamily != UnitConverter.UnitFamily.NONE
-                    && packageFamily == shoppingFamily) {
+            if (packageFamily == shoppingFamily
+                    && (packageFamily != UnitConverter.UnitFamily.NONE || pkgUnit == shopUnit)) {
                 BigDecimal packageBase = UnitConverter.toBaseUnits(
                         packageMeasurement.getQuantity(), pkgUnit);
                 BigDecimal shoppingBase = UnitConverter.toBaseUnits(item.quantity(), shopUnit);
@@ -171,18 +187,17 @@ public class StoreEnrichmentOrchestrator {
             }
         }
 
-        return new ShoppingItem(
-                item.ingredientId(),
-                item.ingredientName(),
-                item.quantity(),
-                item.unit(),
-                match.storeAisle(),
-                totalPrice,
-                totalPromo,
-                match.storeStockLevel(),
+        return new StoreProductAlternative(
+                match.storeProductId(),
                 match.storeProductName(),
+                match.storeAisle(),
+                match.storePrice(),
+                match.storePromoPrice(),
+                match.storeStockLevel(),
                 match.storePackageSize(),
-                qtyNeeded
+                qtyNeeded,
+                totalPrice,
+                totalPromo
         );
     }
 }

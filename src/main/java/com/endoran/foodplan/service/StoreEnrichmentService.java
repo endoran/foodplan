@@ -6,6 +6,6 @@ import java.util.List;
 import java.util.Map;
 
 public interface StoreEnrichmentService {
-    Map<String, StoreProductMatch> enrich(List<String> ingredientNames);
+    Map<String, List<StoreProductMatch>> enrich(List<String> ingredientNames);
     String storeName();
 }

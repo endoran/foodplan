@@ -12,7 +12,9 @@ import com.endoran.foodplan.model.MealType;
 import com.endoran.foodplan.model.Recipe;
 import com.endoran.foodplan.repository.IngredientRepository;
 import com.endoran.foodplan.repository.InventoryItemRepository;
+import com.endoran.foodplan.model.PinnedRecipe;
 import com.endoran.foodplan.repository.MealPlanEntryRepository;
+import com.endoran.foodplan.repository.PinnedRecipeRepository;
 import com.endoran.foodplan.repository.RecipeRepository;
 import org.springframework.stereotype.Service;
 
@@ -29,28 +31,40 @@ public class MealPlanEntryService {
     private final RecipeRepository recipeRepository;
     private final IngredientRepository ingredientRepository;
     private final InventoryItemRepository inventoryItemRepository;
+    private final PinnedRecipeRepository pinnedRecipeRepository;
 
     public MealPlanEntryService(MealPlanEntryRepository mealPlanEntryRepository,
                                 RecipeRepository recipeRepository,
                                 IngredientRepository ingredientRepository,
-                                InventoryItemRepository inventoryItemRepository) {
+                                InventoryItemRepository inventoryItemRepository,
+                                PinnedRecipeRepository pinnedRecipeRepository) {
         this.mealPlanEntryRepository = mealPlanEntryRepository;
         this.recipeRepository = recipeRepository;
         this.ingredientRepository = ingredientRepository;
         this.inventoryItemRepository = inventoryItemRepository;
+        this.pinnedRecipeRepository = pinnedRecipeRepository;
     }
 
     public MealPlanEntryResponse create(String orgId, CreateMealPlanEntryRequest request) {
-        Recipe recipe = findRecipeByIdAndOrg(orgId, request.recipeId());
-
         MealPlanEntry entry = new MealPlanEntry();
         entry.setOrgId(orgId);
         entry.setDate(request.date());
         entry.setMealType(request.mealType());
-        entry.setRecipeId(recipe.getId());
-        entry.setRecipeName(recipe.getName());
         entry.setServings(request.servings());
         entry.setNotes(request.notes());
+
+        if (request.pinnedId() != null && !request.pinnedId().isBlank()) {
+            PinnedRecipe pin = pinnedRecipeRepository.findByIdAndOrgId(request.pinnedId(), orgId)
+                    .orElseThrow(() -> new RecipeNotFoundException("Pinned recipe " + request.pinnedId()));
+            entry.setRecipeId(request.pinnedId());
+            entry.setRecipeName(pin.getName());
+            entry.setPinnedId(request.pinnedId());
+        } else {
+            Recipe recipe = findRecipeByIdAndOrg(orgId, request.recipeId());
+            entry.setRecipeId(recipe.getId());
+            entry.setRecipeName(recipe.getName());
+        }
+
         entry = mealPlanEntryRepository.save(entry);
         return toResponse(entry);
     }

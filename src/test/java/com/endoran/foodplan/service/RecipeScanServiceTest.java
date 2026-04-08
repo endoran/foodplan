@@ -4,6 +4,8 @@ import com.endoran.foodplan.dto.ImportedIngredientPreview;
 import com.endoran.foodplan.dto.ImportedRecipePreview;
 import org.junit.jupiter.api.Test;
 
+import static org.mockito.Mockito.mock;
+
 class RecipeScanServiceTest {
 
     private static final String OCR_TEXT = """
@@ -135,7 +137,8 @@ class RecipeScanServiceTest {
     @Test
     void parseButterChickenSoup() {
         RecipeImportService importService = new RecipeImportService();
-        RecipeScanService scanService = new RecipeScanService(importService);
+        OllamaRecipeExtractor extractor = mock(OllamaRecipeExtractor.class);
+        RecipeScanService scanService = new RecipeScanService(importService, extractor);
         ImportedRecipePreview preview = scanService.parseScannedText(OCR_TEXT);
 
         System.out.println("Title: " + preview.name());

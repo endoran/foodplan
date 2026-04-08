@@ -32,21 +32,7 @@ server {
         proxy_set_header Host $host;
     }
 
-    # Hashed assets — cache forever
-    location /assets/ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-
-    # index.html — never cache (ensures fresh JS/CSS bundle references)
-    location = /index.html {
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
-        add_header Pragma "no-cache";
-    }
-
     location / {
         try_files $uri $uri/ /index.html;
-        # SPA fallback also serves index.html — prevent caching
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
     }
 }

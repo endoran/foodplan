@@ -369,3 +369,16 @@ body {
   .week-grid { grid-template-columns: 1fr; }
   .month-view { display: none; }
 }
+
+/* Product variant dropdown */
+.variant-select {
+  width: 100%;
+  max-width: 320px;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}

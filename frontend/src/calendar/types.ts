@@ -24,6 +24,7 @@ export interface CreateMealPlanRequest {
   recipeId: string;
   servings: number;
   notes?: string;
+  pinnedId?: string;
 }
 
 export type CalendarView = 'week' | 'month';

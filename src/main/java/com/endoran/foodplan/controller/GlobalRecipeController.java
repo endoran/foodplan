@@ -97,12 +97,18 @@ public class GlobalRecipeController {
     }
 
     @DeleteMapping("/pin/{pinnedId}")
-    public ResponseEntity<Void> unpin(
+    public ResponseEntity<?> unpin(
             @AuthenticationPrincipal Jwt jwt,
-            @PathVariable String pinnedId) {
+            @PathVariable String pinnedId,
+            @RequestParam(defaultValue = "false") boolean cascade) {
         checkEnabled();
         String orgId = jwt.getClaimAsString("orgId");
-        globalRecipeService.unpin(orgId, pinnedId);
+        int calendarCount = globalRecipeService.unpinCalendarCount(orgId, pinnedId);
+        if (calendarCount > 0 && !cascade) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("calendarEntryCount", calendarCount));
+        }
+        globalRecipeService.unpin(orgId, pinnedId, cascade);
         return ResponseEntity.noContent().build();
     }
 

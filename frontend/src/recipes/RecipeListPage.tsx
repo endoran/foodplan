@@ -13,6 +13,7 @@ export function RecipeListPage() {
   const [pins, setPins] = useState<PinnedRecipe[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmUnpin, setConfirmUnpin] = useState<string | null>(null);
+  const [calendarWarning, setCalendarWarning] = useState<{ pinnedId: string; count: number } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -66,7 +67,22 @@ export function RecipeListPage() {
     setBusy(pinnedId);
     setConfirmUnpin(null);
     try {
-      await unpinRecipe(pinnedId);
+      const result = await unpinRecipe(pinnedId);
+      if (result.conflict) {
+        setCalendarWarning({ pinnedId, count: result.calendarEntryCount! });
+        return;
+      }
+      await loadPins();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleCascadeUnpin = async (pinnedId: string) => {
+    setBusy(pinnedId);
+    setCalendarWarning(null);
+    try {
+      await unpinRecipe(pinnedId, true);
       await loadPins();
     } finally {
       setBusy(null);
@@ -149,28 +165,54 @@ export function RecipeListPage() {
               <p className="muted">
                 {pin.ingredients.length} ingredient{pin.ingredients.length !== 1 ? 's' : ''}
               </p>
-              {confirmUnpin === pin.id ? (
+              {(confirmUnpin === pin.id || calendarWarning?.pinnedId === pin.id) ? (
                 <div style={{
                   marginTop: '0.5rem', padding: '0.5rem',
                   background: 'var(--surface)', borderRadius: 'var(--radius)',
                   border: '1px solid var(--border)',
                 }}>
-                  <p style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>Remove from your recipes?</p>
-                  <div className="btn-group">
-                    <button
-                      className="btn btn-small btn-danger"
-                      disabled={busy === pin.id}
-                      onClick={() => handleUnpin(pin.id)}
-                    >
-                      {busy === pin.id ? '...' : 'Yes, Unpin'}
-                    </button>
-                    <button
-                      className="btn btn-small"
-                      onClick={() => setConfirmUnpin(null)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
+                  {calendarWarning?.pinnedId === pin.id ? (
+                    <>
+                      <p style={{ fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--danger, #dc3545)' }}>
+                        This recipe is on your calendar ({calendarWarning.count} meal{calendarWarning.count !== 1 ? 's' : ''}).
+                        Unpinning will remove it from your calendar and shopping list.
+                      </p>
+                      <div className="btn-group">
+                        <button
+                          className="btn btn-small btn-danger"
+                          disabled={busy === pin.id}
+                          onClick={() => handleCascadeUnpin(pin.id)}
+                        >
+                          {busy === pin.id ? '...' : 'Unpin & Remove Meals'}
+                        </button>
+                        <button
+                          className="btn btn-small"
+                          onClick={() => { setCalendarWarning(null); setConfirmUnpin(null); }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>Remove from your recipes?</p>
+                      <div className="btn-group">
+                        <button
+                          className="btn btn-small btn-danger"
+                          disabled={busy === pin.id}
+                          onClick={() => handleUnpin(pin.id)}
+                        >
+                          {busy === pin.id ? '...' : 'Yes, Unpin'}
+                        </button>
+                        <button
+                          className="btn btn-small"
+                          onClick={() => setConfirmUnpin(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="btn-group" style={{ marginTop: '0.5rem', flexWrap: 'wrap' }}>

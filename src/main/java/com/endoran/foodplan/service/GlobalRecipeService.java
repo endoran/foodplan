@@ -15,7 +15,10 @@ import com.endoran.foodplan.model.Measurement;
 import com.endoran.foodplan.model.MeasurementUnit;
 import com.endoran.foodplan.model.Recipe;
 import com.endoran.foodplan.model.SharedRecipeIngredient;
+import com.endoran.foodplan.repository.MealPlanEntryRepository;
 import com.endoran.foodplan.repository.PinnedRecipeRepository;
+import com.endoran.foodplan.model.Ingredient;
+import com.endoran.foodplan.repository.IngredientRepository;
 import com.endoran.foodplan.repository.RecipeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +49,8 @@ public class GlobalRecipeService {
     private final MongoTemplate sharedMongo;
     private final PinnedRecipeRepository pinnedRecipeRepository;
     private final RecipeRepository recipeRepository;
+    private final IngredientRepository ingredientRepository;
+    private final MealPlanEntryRepository mealPlanEntryRepository;
     private final boolean enabled;
     private final String instanceId;
     private final String instanceName;
@@ -58,12 +63,16 @@ public class GlobalRecipeService {
             SharedMongoHolder sharedMongoHolder,
             PinnedRecipeRepository pinnedRecipeRepository,
             RecipeRepository recipeRepository,
+            IngredientRepository ingredientRepository,
+            MealPlanEntryRepository mealPlanEntryRepository,
             @Qualifier("globalRecipeBookEnabled") boolean enabled,
             @Value("${foodplan.instance.id:}") String instanceId,
             @Value("${foodplan.instance.name:}") String instanceName) {
         this.sharedMongo = sharedMongoHolder.getTemplate();
         this.pinnedRecipeRepository = pinnedRecipeRepository;
         this.recipeRepository = recipeRepository;
+        this.ingredientRepository = ingredientRepository;
+        this.mealPlanEntryRepository = mealPlanEntryRepository;
         this.enabled = enabled;
         this.instanceId = instanceId;
         this.instanceName = instanceName;
@@ -197,9 +206,19 @@ public class GlobalRecipeService {
         return toPinnedResponse(pin, shared.getVersion(), false);
     }
 
-    public void unpin(String orgId, String pinnedId) {
+    public int unpinCalendarCount(String orgId, String pinnedId) {
+        pinnedRecipeRepository.findByIdAndOrgId(pinnedId, orgId)
+                .orElseThrow(() -> new RecipeNotFoundException("Pinned recipe " + pinnedId));
+        return mealPlanEntryRepository.findByOrgIdAndPinnedId(orgId, pinnedId).size();
+    }
+
+    public void unpin(String orgId, String pinnedId, boolean cascade) {
         PinnedRecipe pin = pinnedRecipeRepository.findByIdAndOrgId(pinnedId, orgId)
                 .orElseThrow(() -> new RecipeNotFoundException("Pinned recipe " + pinnedId));
+        if (cascade) {
+            mealPlanEntryRepository.deleteByOrgIdAndPinnedId(orgId, pinnedId);
+            log.info("Cascade-deleted meal plan entries for pinned recipe '{}'", pin.getName());
+        }
         pinnedRecipeRepository.delete(pin);
         log.info("Unpinned recipe '{}'", pin.getName());
     }
@@ -264,6 +283,7 @@ public class GlobalRecipeService {
                 })
                 .toList());
 
+        autoCreateIngredients(orgId, recipe.getIngredients());
         recipe = recipeRepository.save(recipe);
         pinnedRecipeRepository.delete(pin);
         log.info("Copied pinned recipe '{}' as local recipe '{}'", pin.getName(), recipe.getId());
@@ -278,6 +298,26 @@ public class GlobalRecipeService {
                 recipe.getId(), recipe.getName(), recipe.getInstructions(),
                 recipe.getBaseServings(), recipe.getBaseServings(),
                 ingredients, false);
+    }
+
+    private void autoCreateIngredients(String orgId, List<com.endoran.foodplan.model.RecipeIngredient> ingredients) {
+        for (var ri : ingredients) {
+            if (ri.getIngredientId() != null && !ri.getIngredientId().isBlank()) continue;
+            var existing = ingredientRepository.findByOrgIdAndNameIgnoreCase(orgId, ri.getIngredientName());
+            if (existing.isPresent()) {
+                ri.setIngredientId(existing.get().getId());
+            } else {
+                var inferred = IngredientCategoryInference.infer(ri.getIngredientName());
+                Ingredient newIng = new Ingredient();
+                newIng.setOrgId(orgId);
+                newIng.setName(ri.getIngredientName());
+                newIng.setStorageCategory(inferred.storage());
+                newIng.setGroceryCategory(inferred.grocery());
+                newIng.setNeedsReview(true);
+                newIng = ingredientRepository.save(newIng);
+                ri.setIngredientId(newIng.getId());
+            }
+        }
     }
 
     private boolean isSharedMongoReachable() {

@@ -17,6 +17,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +28,7 @@ public class KrogerEnrichmentService implements StoreEnrichmentService {
 
     private static final Logger log = LoggerFactory.getLogger(KrogerEnrichmentService.class);
     private static final String API_BASE = "https://api.kroger.com";
+    private static final int MAX_ALTERNATIVES = 8;
 
     private final String clientId;
     private final String clientSecret;
@@ -61,7 +63,7 @@ public class KrogerEnrichmentService implements StoreEnrichmentService {
     }
 
     @Override
-    public Map<String, StoreProductMatch> enrich(List<String> ingredientNames) {
+    public Map<String, List<StoreProductMatch>> enrich(List<String> ingredientNames) {
         if (!isConfigured()) return Map.of();
 
         String token;
@@ -72,12 +74,12 @@ public class KrogerEnrichmentService implements StoreEnrichmentService {
             return Map.of();
         }
 
-        Map<String, StoreProductMatch> results = new HashMap<>();
+        Map<String, List<StoreProductMatch>> results = new HashMap<>();
         for (String name : ingredientNames) {
             try {
-                StoreProductMatch match = searchProduct(token, name);
-                if (match != null) {
-                    results.put(name, match);
+                List<StoreProductMatch> matches = searchProducts(token, name);
+                if (!matches.isEmpty()) {
+                    results.put(name, matches);
                 }
             } catch (Exception e) {
                 log.warn("Kroger lookup failed for '{}': {}", name, e.getMessage());
@@ -114,7 +116,7 @@ public class KrogerEnrichmentService implements StoreEnrichmentService {
         return cachedToken;
     }
 
-    private StoreProductMatch searchProduct(String token, String query) throws Exception {
+    private List<StoreProductMatch> searchProducts(String token, String query) throws Exception {
         String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
         String url = API_BASE + "/v1/products?filter.term=" + encoded
                 + "&filter.locationId=" + locationId;
@@ -130,15 +132,27 @@ public class KrogerEnrichmentService implements StoreEnrichmentService {
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
             log.warn("Kroger product search returned {}", response.statusCode());
-            return null;
+            return List.of();
         }
 
         JsonNode root = objectMapper.readTree(response.body());
         JsonNode data = root.get("data");
-        if (data == null || data.isEmpty()) return null;
+        if (data == null || data.isEmpty()) return List.of();
 
-        JsonNode product = data.get(0);
+        List<StoreProductMatch> matches = new ArrayList<>();
+        int limit = Math.min(data.size(), MAX_ALTERNATIVES);
+        for (int i = 0; i < limit; i++) {
+            StoreProductMatch match = parseProduct(data.get(i));
+            if (match != null) {
+                matches.add(match);
+            }
+        }
+        return matches;
+    }
+
+    private StoreProductMatch parseProduct(JsonNode product) {
         String productName = product.has("description") ? product.get("description").asText() : null;
+        String productId = product.has("productId") ? product.get("productId").asText() : null;
 
         // Aisle
         String aisle = null;
@@ -163,6 +177,10 @@ public class KrogerEnrichmentService implements StoreEnrichmentService {
         if (items != null && !items.isEmpty()) {
             JsonNode item = items.get(0);
 
+            if (productId == null && item.has("itemId")) {
+                productId = item.get("itemId").asText();
+            }
+
             JsonNode priceNode = item.get("price");
             if (priceNode != null) {
                 if (priceNode.has("regular")) price = new BigDecimal(priceNode.get("regular").asText());
@@ -186,6 +204,6 @@ public class KrogerEnrichmentService implements StoreEnrichmentService {
             }
         }
 
-        return new StoreProductMatch(aisle, price, promoPrice, stockLevel, productName, packageSize);
+        return new StoreProductMatch(productId, aisle, price, promoPrice, stockLevel, productName, packageSize);
     }
 }
