@@ -4,6 +4,7 @@ import com.endoran.foodplan.model.MeasurementUnit;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ShoppingItem(
@@ -11,15 +12,9 @@ public record ShoppingItem(
         String ingredientName,
         BigDecimal quantity,
         MeasurementUnit unit,
-        String storeAisle,
-        BigDecimal storePrice,
-        BigDecimal storePromoPrice,
-        String storeStockLevel,
-        String storeProductName,
-        String storePackageSize,
-        Integer storeQtyNeeded
+        List<StoreProductAlternative> storeProducts
 ) {
     public ShoppingItem(String ingredientId, String ingredientName, BigDecimal quantity, MeasurementUnit unit) {
-        this(ingredientId, ingredientName, quantity, unit, null, null, null, null, null, null, null);
+        this(ingredientId, ingredientName, quantity, unit, null);
     }
 }

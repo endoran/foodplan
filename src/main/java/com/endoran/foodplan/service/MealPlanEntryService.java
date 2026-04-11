@@ -12,14 +12,21 @@ import com.endoran.foodplan.model.MealType;
 import com.endoran.foodplan.model.Recipe;
 import com.endoran.foodplan.repository.IngredientRepository;
 import com.endoran.foodplan.repository.InventoryItemRepository;
+import com.endoran.foodplan.model.DietaryTag;
+import com.endoran.foodplan.model.PinnedRecipe;
+import com.endoran.foodplan.model.SharedRecipeIngredient;
 import com.endoran.foodplan.repository.MealPlanEntryRepository;
+import com.endoran.foodplan.repository.PinnedRecipeRepository;
 import com.endoran.foodplan.repository.RecipeRepository;
+import com.endoran.foodplan.model.MeasurementUnit;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Collections;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.List;
 
 @Service
@@ -29,28 +36,43 @@ public class MealPlanEntryService {
     private final RecipeRepository recipeRepository;
     private final IngredientRepository ingredientRepository;
     private final InventoryItemRepository inventoryItemRepository;
+    private final PinnedRecipeRepository pinnedRecipeRepository;
+    private final IngredientLinkerService ingredientLinkerService;
 
     public MealPlanEntryService(MealPlanEntryRepository mealPlanEntryRepository,
                                 RecipeRepository recipeRepository,
                                 IngredientRepository ingredientRepository,
-                                InventoryItemRepository inventoryItemRepository) {
+                                InventoryItemRepository inventoryItemRepository,
+                                PinnedRecipeRepository pinnedRecipeRepository,
+                                IngredientLinkerService ingredientLinkerService) {
         this.mealPlanEntryRepository = mealPlanEntryRepository;
         this.recipeRepository = recipeRepository;
         this.ingredientRepository = ingredientRepository;
         this.inventoryItemRepository = inventoryItemRepository;
+        this.pinnedRecipeRepository = pinnedRecipeRepository;
+        this.ingredientLinkerService = ingredientLinkerService;
     }
 
     public MealPlanEntryResponse create(String orgId, CreateMealPlanEntryRequest request) {
-        Recipe recipe = findRecipeByIdAndOrg(orgId, request.recipeId());
-
         MealPlanEntry entry = new MealPlanEntry();
         entry.setOrgId(orgId);
         entry.setDate(request.date());
         entry.setMealType(request.mealType());
-        entry.setRecipeId(recipe.getId());
-        entry.setRecipeName(recipe.getName());
         entry.setServings(request.servings());
         entry.setNotes(request.notes());
+
+        if (request.pinnedId() != null && !request.pinnedId().isBlank()) {
+            PinnedRecipe pin = pinnedRecipeRepository.findByIdAndOrgId(request.pinnedId(), orgId)
+                    .orElseThrow(() -> new RecipeNotFoundException("Pinned recipe " + request.pinnedId()));
+            entry.setRecipeId(request.pinnedId());
+            entry.setRecipeName(pin.getName());
+            entry.setPinnedId(request.pinnedId());
+        } else {
+            Recipe recipe = findRecipeByIdAndOrg(orgId, request.recipeId());
+            entry.setRecipeId(recipe.getId());
+            entry.setRecipeName(recipe.getName());
+        }
+
         entry = mealPlanEntryRepository.save(entry);
         return toResponse(entry);
     }
@@ -97,22 +119,58 @@ public class MealPlanEntryService {
             return toResponse(entry);
         }
 
-        Recipe recipe = findRecipeByIdAndOrg(orgId, entry.getRecipeId());
-        BigDecimal scaleFactor = BigDecimal.valueOf(entry.getServings())
-                .divide(BigDecimal.valueOf(recipe.getBaseServings()), 10, RoundingMode.HALF_UP);
+        Recipe recipe = recipeRepository.findById(entry.getRecipeId()).orElse(null);
+        if (recipe != null && orgId.equals(recipe.getOrgId())) {
+            // Local recipe — deduct inventory normally
+            BigDecimal scaleFactor = BigDecimal.valueOf(entry.getServings())
+                    .divide(BigDecimal.valueOf(recipe.getBaseServings()), 10, RoundingMode.HALF_UP);
 
-        for (var ri : recipe.getIngredients()) {
-            BigDecimal scaledQty = ri.getMeasurement().getQuantity()
-                    .multiply(scaleFactor)
-                    .setScale(2, RoundingMode.HALF_UP);
+            for (var ri : recipe.getIngredients()) {
+                BigDecimal scaledQty = ri.getMeasurement().getQuantity()
+                        .multiply(scaleFactor)
+                        .setScale(2, RoundingMode.HALF_UP);
 
-            inventoryItemRepository.findByOrgIdAndIngredientIdAndUnit(
-                    orgId, ri.getIngredientId(), ri.getMeasurement().getUnit()
-            ).ifPresent(item -> {
-                BigDecimal newQty = item.getQuantity().subtract(scaledQty).max(BigDecimal.ZERO);
-                item.setQuantity(newQty);
-                inventoryItemRepository.save(item);
-            });
+                inventoryItemRepository.findByOrgIdAndIngredientIdAndUnit(
+                        orgId, ri.getIngredientId(), ri.getMeasurement().getUnit()
+                ).ifPresent(item -> {
+                    BigDecimal newQty = item.getQuantity().subtract(scaledQty).max(BigDecimal.ZERO);
+                    item.setQuantity(newQty);
+                    inventoryItemRepository.save(item);
+                });
+            }
+        } else if (entry.getPinnedId() != null) {
+            // Pinned recipe — deduct inventory from shared ingredients
+            PinnedRecipe pin = pinnedRecipeRepository.findByIdAndOrgId(entry.getPinnedId(), orgId)
+                    .orElse(null);
+            if (pin != null) {
+                // Lazy backfill ingredient links
+                if (ingredientLinkerService.needsLinking(pin.getIngredients())) {
+                    ingredientLinkerService.linkSharedIngredients(orgId, pin.getIngredients());
+                    pinnedRecipeRepository.save(pin);
+                }
+
+                BigDecimal scaleFactor = BigDecimal.valueOf(entry.getServings())
+                        .divide(BigDecimal.valueOf(pin.getBaseServings()), 10, RoundingMode.HALF_UP);
+
+                for (SharedRecipeIngredient sri : pin.getIngredients()) {
+                    if (sri.getIngredientId() == null) continue;
+                    BigDecimal scaledQty = BigDecimal.valueOf(sri.getQuantity())
+                            .multiply(scaleFactor)
+                            .setScale(2, RoundingMode.HALF_UP);
+                    try {
+                        MeasurementUnit unit = MeasurementUnit.valueOf(sri.getUnit());
+                        inventoryItemRepository.findByOrgIdAndIngredientIdAndUnit(
+                                orgId, sri.getIngredientId(), unit
+                        ).ifPresent(item -> {
+                            BigDecimal newQty = item.getQuantity().subtract(scaledQty).max(BigDecimal.ZERO);
+                            item.setQuantity(newQty);
+                            inventoryItemRepository.save(item);
+                        });
+                    } catch (IllegalArgumentException e) {
+                        // skip unknown unit
+                    }
+                }
+            }
         }
 
         entry.setStatus(MealStatus.CONFIRMED);
@@ -159,6 +217,8 @@ public class MealPlanEntryService {
         Recipe recipe = recipeRepository.findById(entry.getRecipeId()).orElse(null);
         if (recipe != null) {
             warnings = buildDietaryWarnings(recipe);
+        } else if (entry.getPinnedId() != null) {
+            warnings = buildPinnedDietaryWarnings(entry.getPinnedId());
         }
 
         return new MealPlanEntryResponse(
@@ -172,5 +232,26 @@ public class MealPlanEntryService {
                 entry.getStatus(),
                 warnings
         );
+    }
+
+    private List<DietaryWarning> buildPinnedDietaryWarnings(String pinnedId) {
+        PinnedRecipe pin = pinnedRecipeRepository.findById(pinnedId).orElse(null);
+        if (pin == null || pin.getIngredients() == null) {
+            return Collections.emptyList();
+        }
+        return pin.getIngredients().stream()
+                .filter(i -> i.getDietaryTags() != null && !i.getDietaryTags().isEmpty())
+                .map(i -> {
+                    Set<DietaryTag> tags = i.getDietaryTags().stream()
+                            .map(name -> {
+                                try { return DietaryTag.valueOf(name); }
+                                catch (IllegalArgumentException e) { return null; }
+                            })
+                            .filter(t -> t != null)
+                            .collect(Collectors.toSet());
+                    return new DietaryWarning(i.getIngredientName(), tags);
+                })
+                .filter(w -> !w.tags().isEmpty())
+                .toList();
     }
 }

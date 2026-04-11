@@ -1,7 +1,7 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
 import { apiGet } from '../api/client';
 import { formatEnum } from '../utils/formatEnum';
-import type { ShoppingListResponse } from './types';
+import type { ShoppingItem, ShoppingListResponse, StoreProductAlternative } from './types';
 
 const STORES = [
   { value: '', label: 'No Store' },
@@ -26,46 +26,117 @@ function getSunday(d: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+const FRAC_LABELS: Record<number, string> = {
+  1: '1/8', 2: '1/4', 3: '3/8', 4: '1/2', 5: '5/8', 6: '3/4', 7: '7/8',
+};
+
 function formatQty(q: number): string {
-  return q % 1 === 0 ? String(q) : q.toFixed(2);
+  // Round to nearest 1/8
+  const eighths = Math.round(q * 8);
+  if (eighths === 0) return '0';
+  const whole = Math.floor(eighths / 8);
+  const rem = eighths % 8;
+  if (rem === 0) return String(whole);
+  const fracStr = FRAC_LABELS[rem] || rem + '/8';
+  return whole > 0 ? whole + ' ' + fracStr : fracStr;
 }
 
-function formatPrice(p: number | undefined): string {
+function formatPrice(p: number | undefined | null): string {
   return p != null ? `$${p.toFixed(2)}` : '';
 }
+
+function truncate(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max - 1) + '\u2026' : s;
+}
+
+function optionLabel(alt: StoreProductAlternative): string {
+  let label = truncate(alt.productName || 'Unknown', 40);
+  if (alt.packageSize) label += ` \u2014 ${alt.packageSize}`;
+  if (alt.price != null) label += ` \u2014 $${(alt.promoPrice ?? alt.price).toFixed(2)}`;
+  if (alt.stockLevel === 'OUT') label += ' (Out)';
+  return label;
+}
+
+function itemKey(item: ShoppingItem): string {
+  return item.ingredientId ?? (item.ingredientName + ':' + item.unit);
+}
+
+function getSelected(item: ShoppingItem, selections: Record<string, number>): StoreProductAlternative | null {
+  if (!item.storeProducts?.length) return null;
+  const idx = selections[itemKey(item)] ?? 0;
+  return item.storeProducts[idx] ?? item.storeProducts[0];
+}
+
+type CacheEntry = { data: ShoppingListResponse; timestamp: number };
 
 export function ShoppingListPage() {
   const now = new Date();
   const [from, setFrom] = useState(getMonday(now));
   const [to, setTo] = useState(getSunday(now));
-  const [store, setStore] = useState(() => localStorage.getItem('preferredStore') || '');
+  const [store, setStore] = useState(() => sessionStorage.getItem('selectedStore') || '');
   const [result, setResult] = useState<ShoppingListResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [selections, setSelections] = useState<Record<string, number>>({});
 
-  const generate = async (fromDate: string, toDate: string, storeVal: string) => {
+  const cache = useRef<Map<string, CacheEntry>>(new Map());
+  const CACHE_TTL_MS = 5 * 60 * 1000;
+
+  const cacheKey = useCallback((f: string, t: string, s: string) => `${f}|${t}|${s}`, []);
+
+  const generate = useCallback(async (fromDate: string, toDate: string, storeVal: string, force = false) => {
+    const key = cacheKey(fromDate, toDate, storeVal);
+
+    if (!force) {
+      const cached = cache.current.get(key);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        setResult(cached.data);
+        setSelections({});
+        return;
+      }
+    }
+
     setError('');
     setLoading(true);
+    setSelections({});
     try {
       let url = `/api/v1/shopping-list?from=${fromDate}&to=${toDate}`;
       if (storeVal) url += `&store=${storeVal}`;
       const data = await apiGet<ShoppingListResponse>(url);
       setResult(data);
+      cache.current.set(key, { data, timestamp: Date.now() });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate');
     } finally {
       setLoading(false);
     }
+  }, [cacheKey]);
+
+  const invalidateCache = useCallback(() => {
+    cache.current.clear();
+  }, []);
+
+  useEffect(() => {
+    generate(from, to, store);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleGenerate = () => {
+    invalidateCache();
+    generate(from, to, store, true);
   };
-
-  useEffect(() => { generate(from, to, store); }, []);
-
-  const handleGenerate = () => generate(from, to, store);
 
   const handleStoreChange = (value: string) => {
     setStore(value);
-    localStorage.setItem('preferredStore', value);
+    if (value) {
+      sessionStorage.setItem('selectedStore', value);
+    } else {
+      sessionStorage.removeItem('selectedStore');
+    }
     generate(from, to, value);
+  };
+
+  const handleVariantChange = (key: string, index: number) => {
+    setSelections(prev => ({ ...prev, [key]: index }));
   };
 
   const hasStore = !!result?.storeName;
@@ -73,7 +144,9 @@ export function ShoppingListPage() {
 
   const total = hasStore
     ? result!.aisles.flatMap(a => a.items).reduce((sum, item) => {
-        const price = item.storePromoPrice ?? item.storePrice;
+        const sel = getSelected(item, selections);
+        if (!sel) return sum;
+        const price = sel.totalPromoPrice ?? sel.totalPrice;
         return sum + (price ?? 0);
       }, 0)
     : 0;
@@ -140,33 +213,53 @@ export function ShoppingListPage() {
                   <td colSpan={colCount}><strong>{formatEnum(aisle.category)}</strong></td>
                 </tr>
                 {aisle.items.map(item => {
+                  const sel = getSelected(item, selections);
+                  const alts = item.storeProducts ?? [];
                   return (
-                    <tr key={item.ingredientId}>
+                    <tr key={itemKey(item)}>
                       <td>{item.ingredientName}</td>
-                      {hasStore && <td>{item.storeAisle || '-'}</td>}
+                      {hasStore && <td>{sel?.aisle || '-'}</td>}
                       <td>{formatQty(Number(item.quantity))}</td>
                       <td>{formatEnum(item.unit)}</td>
-                      {hasStore && <td className="muted" style={{ fontSize: '0.85rem' }}>{item.storeProductName || '-'}</td>}
-                      {hasStore && <td>{item.storePackageSize || '-'}</td>}
-                      {hasStore && <td>{item.storeQtyNeeded ?? '-'}</td>}
+                      {hasStore && (
+                        <td className="muted" style={{ fontSize: '0.85rem' }}>
+                          {alts.length === 0 && '-'}
+                          {alts.length === 1 && (sel?.productName || '-')}
+                          {alts.length > 1 && (
+                            <select
+                              className="variant-select"
+                              value={selections[itemKey(item)] ?? 0}
+                              onChange={e => handleVariantChange(itemKey(item), Number(e.target.value))}
+                            >
+                              {alts.map((alt, idx) => (
+                                <option key={alt.productId ?? idx} value={idx}>
+                                  {optionLabel(alt)}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                      )}
+                      {hasStore && <td>{sel?.packageSize || '-'}</td>}
+                      {hasStore && <td>{sel?.qtyNeeded ?? '-'}</td>}
                       {hasStore && (
                         <td>
-                          {item.storePromoPrice != null ? (
+                          {sel?.totalPromoPrice != null ? (
                             <>
-                              <span className="price-promo">{formatPrice(item.storePromoPrice)}</span>
-                              <span className="price-regular-struck">{formatPrice(item.storePrice)}</span>
+                              <span className="price-promo">{formatPrice(sel.totalPromoPrice)}</span>
+                              <span className="price-regular-struck">{formatPrice(sel.totalPrice)}</span>
                             </>
                           ) : (
-                            formatPrice(item.storePrice) || '-'
+                            formatPrice(sel?.totalPrice) || '-'
                           )}
                         </td>
                       )}
                       {hasStore && (
                         <td>
-                          {item.storeStockLevel === 'HIGH' && <span className="stock-high">In Stock</span>}
-                          {item.storeStockLevel === 'LOW' && <span className="stock-low">Low</span>}
-                          {item.storeStockLevel === 'OUT' && <span className="stock-out">Out</span>}
-                          {!item.storeStockLevel && '-'}
+                          {sel?.stockLevel === 'HIGH' && <span className="stock-high">In Stock</span>}
+                          {sel?.stockLevel === 'LOW' && <span className="stock-low">Low</span>}
+                          {sel?.stockLevel === 'OUT' && <span className="stock-out">Out</span>}
+                          {!sel?.stockLevel && '-'}
                         </td>
                       )}
                     </tr>

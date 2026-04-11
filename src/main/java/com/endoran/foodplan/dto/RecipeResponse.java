@@ -8,5 +8,7 @@ public record RecipeResponse(
         String instructions,
         int baseServings,
         int servings,
-        List<RecipeIngredientResponse> ingredients
+        List<RecipeIngredientResponse> ingredients,
+        boolean shared,
+        List<String> dietaryLabels
 ) {}

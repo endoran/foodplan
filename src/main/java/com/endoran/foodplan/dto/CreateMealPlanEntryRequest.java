@@ -12,5 +12,6 @@ public record CreateMealPlanEntryRequest(
         @NotNull MealType mealType,
         @NotBlank String recipeId,
         @Min(1) int servings,
-        String notes
+        String notes,
+        String pinnedId
 ) {}

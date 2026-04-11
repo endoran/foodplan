@@ -18,6 +18,7 @@ public class MealPlanEntry {
     private int servings = 1;
     private String notes;
     private MealStatus status = MealStatus.PLANNED;
+    private String pinnedId;
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -45,4 +46,7 @@ public class MealPlanEntry {
 
     public MealStatus getStatus() { return status; }
     public void setStatus(MealStatus status) { this.status = status; }
+
+    public String getPinnedId() { return pinnedId; }
+    public void setPinnedId(String pinnedId) { this.pinnedId = pinnedId; }
 }

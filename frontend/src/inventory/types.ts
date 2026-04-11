@@ -6,18 +6,25 @@ export interface InventoryItem {
   unit: string;
 }
 
+export interface StoreProductAlternative {
+  productId: string;
+  productName: string;
+  aisle: string;
+  price: number | null;
+  promoPrice: number | null;
+  stockLevel: string | null;
+  packageSize: string | null;
+  qtyNeeded: number | null;
+  totalPrice: number | null;
+  totalPromoPrice: number | null;
+}
+
 export interface ShoppingItem {
   ingredientId: string;
   ingredientName: string;
   quantity: number;
   unit: string;
-  storeAisle?: string;
-  storePrice?: number;
-  storePromoPrice?: number;
-  storeStockLevel?: string;
-  storeProductName?: string;
-  storePackageSize?: string;
-  storeQtyNeeded?: number;
+  storeProducts?: StoreProductAlternative[];
 }
 
 export interface ShoppingAisle {

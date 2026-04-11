@@ -244,6 +244,66 @@ class ShoppingListFunctionalTest {
                 .andExpect(jsonPath("$.aisles[0].items[0].quantity").value(2.00));
     }
 
+    @Test
+    void nullIngredientIdsProduceSeparateItems() throws Exception {
+        // Regression: recipes without ingredient linkage (null ingredientId)
+        // must not collapse all items of the same unit family into one entry.
+        String token = registerAndGetToken("chef@example.com", "password123", "Test Kitchen");
+
+        RecipeIngredientRequest stock = new RecipeIngredientRequest(null,
+                null, "Chicken Stock", new BigDecimal("2.00"), MeasurementUnit.CUP);
+        RecipeIngredientRequest cream = new RecipeIngredientRequest(null,
+                null, "Heavy Cream", new BigDecimal("1.00"), MeasurementUnit.CUP);
+        RecipeIngredientRequest onion = new RecipeIngredientRequest(null,
+                null, "Onion", new BigDecimal("3.00"), MeasurementUnit.WHOLE);
+        RecipeIngredientRequest garlic = new RecipeIngredientRequest(null,
+                null, "Garlic", new BigDecimal("5.00"), MeasurementUnit.WHOLE);
+        String recipeId = createRecipeWithIngredients(token, "Soup", 1,
+                List.of(stock, cream, onion, garlic));
+
+        createMealPlanEntry(token, LocalDate.of(2026, 4, 1), MealType.DINNER, recipeId, 1);
+
+        mockMvc.perform(get("/api/v1/shopping-list")
+                        .header("Authorization", "Bearer " + token)
+                        .param("from", "2026-04-01")
+                        .param("to", "2026-04-07"))
+                .andExpect(status().isOk())
+                // 4 distinct ingredients, not collapsed by unit family
+                .andExpect(jsonPath("$.aisles[*].items[*]", hasSize(4)))
+                .andExpect(jsonPath("$.aisles[*].items[?(@.ingredientName == 'Chicken Stock')].quantity",
+                        contains(2.00)))
+                .andExpect(jsonPath("$.aisles[*].items[?(@.ingredientName == 'Heavy Cream')].quantity",
+                        contains(1.00)));
+    }
+
+    @Test
+    void nullIngredientIdsSameNameStillAggregate() throws Exception {
+        // Two recipes both using "Onion" with null ingredientId should aggregate
+        // by name since they represent the same ingredient.
+        String token = registerAndGetToken("chef@example.com", "password123", "Test Kitchen");
+
+        RecipeIngredientRequest onionA = new RecipeIngredientRequest(null,
+                null, "Onion", new BigDecimal("2.00"), MeasurementUnit.WHOLE);
+        String recipeA = createRecipeWithIngredients(token, "Soup", 1, List.of(onionA));
+
+        RecipeIngredientRequest onionB = new RecipeIngredientRequest(null,
+                null, "Onion", new BigDecimal("3.00"), MeasurementUnit.WHOLE);
+        String recipeB = createRecipeWithIngredients(token, "Stew", 1, List.of(onionB));
+
+        createMealPlanEntry(token, LocalDate.of(2026, 4, 1), MealType.DINNER, recipeA, 1);
+        createMealPlanEntry(token, LocalDate.of(2026, 4, 2), MealType.DINNER, recipeB, 1);
+
+        mockMvc.perform(get("/api/v1/shopping-list")
+                        .header("Authorization", "Bearer " + token)
+                        .param("from", "2026-04-01")
+                        .param("to", "2026-04-07"))
+                .andExpect(status().isOk())
+                // Same name → one aggregated item: 2 + 3 = 5
+                .andExpect(jsonPath("$.aisles[*].items[*]", hasSize(1)))
+                .andExpect(jsonPath("$.aisles[0].items[0].ingredientName").value("Onion"))
+                .andExpect(jsonPath("$.aisles[0].items[0].quantity").value(closeTo(5.00, 0.01)));
+    }
+
     // --- Helpers ---
 
     private String registerAndGetToken(String email, String password, String orgName) throws Exception {

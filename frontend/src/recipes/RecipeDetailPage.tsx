@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiGet, apiDelete } from '../api/client';
+import { getGlobalBookStatus } from '../api/globalRecipes';
+import { ShareRecipeButton } from './ShareRecipeButton';
 import type { Recipe } from './types';
 
 export function RecipeDetailPage() {
@@ -9,9 +11,13 @@ export function RecipeDetailPage() {
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [servings, setServings] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [globalEnabled, setGlobalEnabled] = useState(false);
 
   useEffect(() => {
     loadRecipe();
+    getGlobalBookStatus()
+      .then(s => setGlobalEnabled(s.enabled))
+      .catch(() => setGlobalEnabled(false));
   }, [id]);
 
   const loadRecipe = async (targetServings?: number) => {
@@ -44,8 +50,14 @@ export function RecipeDetailPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>{recipe.name}</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Link to="/recipes" className="btn btn-small">&larr; Back</Link>
+          <h1>{recipe.name}</h1>
+        </div>
         <div className="btn-group">
+          {globalEnabled && (
+            <ShareRecipeButton recipeId={id!} initialShared={recipe.shared ?? false} />
+          )}
           <Link to={`/recipes/${id}/edit`} className="btn">Edit</Link>
           <button onClick={handleDelete} className="btn btn-danger">Delete</button>
         </div>
@@ -74,7 +86,6 @@ export function RecipeDetailPage() {
           <p className="muted">No ingredients added.</p>
         ) : (
           (() => {
-            // Group ingredients by section, preserving order
             const groups: { section: string | null; items: typeof recipe.ingredients }[] = [];
             recipe.ingredients.forEach((ing) => {
               const last = groups[groups.length - 1];
@@ -107,8 +118,6 @@ export function RecipeDetailPage() {
           })()
         )}
       </div>
-
-      <Link to="/recipes" className="btn">Back to Recipes</Link>
     </div>
   );
 }

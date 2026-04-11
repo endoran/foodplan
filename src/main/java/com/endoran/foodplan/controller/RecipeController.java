@@ -121,6 +121,13 @@ public class RecipeController {
         }
     }
 
+    @PostMapping("/backfill-ingredients")
+    public ResponseEntity<Map<String, Integer>> backfillIngredients(
+            @AuthenticationPrincipal Jwt jwt) {
+        String orgId = jwt.getClaimAsString("orgId");
+        return ResponseEntity.ok(recipeService.backfillIngredients(orgId));
+    }
+
     @ExceptionHandler(RecipeImportException.class)
     public ResponseEntity<Map<String, String>> handleImportError(RecipeImportException ex) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)

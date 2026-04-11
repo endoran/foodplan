@@ -21,6 +21,8 @@ export interface Recipe {
   baseServings: number;
   servings: number;
   ingredients: RecipeIngredient[];
+  shared?: boolean;
+  dietaryLabels?: string[];
 }
 
 export interface Ingredient {

@@ -102,7 +102,7 @@ export function CalendarPage() {
         handleMealChange();
       }
     } else {
-      // New recipe from sidebar
+      // New recipe from sidebar — if pinned, resolve to local recipe first
       setPendingDrop({ date, data });
     }
   };
@@ -114,6 +114,7 @@ export function CalendarPage() {
       mealType,
       recipeId: pendingDrop.data.recipeId,
       servings,
+      ...(pendingDrop.data.pinnedId ? { pinnedId: pendingDrop.data.pinnedId } : {}),
     };
     await apiPost('/api/v1/meal-plan', body);
     setPendingDrop(null);
