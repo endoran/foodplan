@@ -23,7 +23,7 @@ import java.util.Map;
 public class ChefStoreEnrichmentService implements StoreEnrichmentService {
 
     private static final Logger log = LoggerFactory.getLogger(ChefStoreEnrichmentService.class);
-    private static final int MAX_ALTERNATIVES = 8;
+    private final int maxAlternatives;
 
     private final String appId;
     private final String apiKey;
@@ -35,11 +35,13 @@ public class ChefStoreEnrichmentService implements StoreEnrichmentService {
             @Value("${chefstore.algolia.appId:70KQ5FEQ31}") String appId,
             @Value("${chefstore.algolia.apiKey:48035a5322b28e6485ae9f3b235b150a}") String apiKey,
             @Value("${chefstore.algolia.storeNumber:553}") String storeNumber,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            @Value("${store.maxAlternatives:8}") int maxAlternatives) {
         this.appId = appId;
         this.apiKey = apiKey;
         this.storeNumber = storeNumber;
         this.objectMapper = objectMapper;
+        this.maxAlternatives = maxAlternatives;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
                 .build();
@@ -94,7 +96,7 @@ public class ChefStoreEnrichmentService implements StoreEnrichmentService {
 
         List<StoreProductMatch> matches = new ArrayList<>();
         for (JsonNode hit : hits) {
-            if (matches.size() >= MAX_ALTERNATIVES) break;
+            if (matches.size() >= maxAlternatives) break;
 
             String exists = getStoreField(hit, "itemExists");
             if (!"1".equals(exists)) continue;

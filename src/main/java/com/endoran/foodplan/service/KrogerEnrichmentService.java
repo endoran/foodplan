@@ -28,7 +28,7 @@ public class KrogerEnrichmentService implements StoreEnrichmentService {
 
     private static final Logger log = LoggerFactory.getLogger(KrogerEnrichmentService.class);
     private static final String API_BASE = "https://api.kroger.com";
-    private static final int MAX_ALTERNATIVES = 8;
+    private final int maxAlternatives;
 
     private final String clientId;
     private final String clientSecret;
@@ -43,11 +43,13 @@ public class KrogerEnrichmentService implements StoreEnrichmentService {
             @Value("${kroger.clientId:}") String clientId,
             @Value("${kroger.clientSecret:}") String clientSecret,
             @Value("${kroger.locationId:}") String locationId,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            @Value("${store.maxAlternatives:8}") int maxAlternatives) {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
         this.locationId = locationId;
         this.objectMapper = objectMapper;
+        this.maxAlternatives = maxAlternatives;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
@@ -140,7 +142,7 @@ public class KrogerEnrichmentService implements StoreEnrichmentService {
         if (data == null || data.isEmpty()) return List.of();
 
         List<StoreProductMatch> matches = new ArrayList<>();
-        int limit = Math.min(data.size(), MAX_ALTERNATIVES);
+        int limit = Math.min(data.size(), maxAlternatives);
         for (int i = 0; i < limit; i++) {
             StoreProductMatch match = parseProduct(data.get(i));
             if (match != null) {
