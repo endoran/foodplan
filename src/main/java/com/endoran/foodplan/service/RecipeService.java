@@ -123,7 +123,9 @@ public class RecipeService {
                 recipe.getBaseServings(),
                 effectiveServings,
                 ingredients,
-                isShared
+                isShared,
+                RecipeDietaryLabels.compute(recipe.getIngredients().stream()
+                        .map(ri -> ri.getIngredientName()).toList())
         );
     }
 

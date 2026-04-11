@@ -3,6 +3,7 @@ export interface SharedRecipeIngredient {
   quantity: number;
   unit: string;
   section: string | null;
+  dietaryTags: string[];
 }
 
 export interface SharedRecipe {
@@ -17,6 +18,7 @@ export interface SharedRecipe {
   sharedAt: string;
   updatedAt: string;
   ownedByCurrentInstance: boolean;
+  dietaryLabels: string[];
 }
 
 export interface PinnedRecipe {
@@ -33,6 +35,7 @@ export interface PinnedRecipe {
   latestVersion: number | null;
   sourceRemoved: boolean;
   pinnedAt: string;
+  dietaryLabels: string[];
 }
 
 export interface GlobalBookStatus {

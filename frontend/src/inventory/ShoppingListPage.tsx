@@ -26,8 +26,19 @@ function getSunday(d: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+const FRAC_LABELS: Record<number, string> = {
+  1: '1/8', 2: '1/4', 3: '3/8', 4: '1/2', 5: '5/8', 6: '3/4', 7: '7/8',
+};
+
 function formatQty(q: number): string {
-  return q % 1 === 0 ? String(q) : q.toFixed(2);
+  // Round to nearest 1/8
+  const eighths = Math.round(q * 8);
+  if (eighths === 0) return '0';
+  const whole = Math.floor(eighths / 8);
+  const rem = eighths % 8;
+  if (rem === 0) return String(whole);
+  const fracStr = FRAC_LABELS[rem] || rem + '/8';
+  return whole > 0 ? whole + ' ' + fracStr : fracStr;
 }
 
 function formatPrice(p: number | undefined | null): string {

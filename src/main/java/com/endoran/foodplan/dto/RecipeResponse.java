@@ -9,5 +9,6 @@ public record RecipeResponse(
         int baseServings,
         int servings,
         List<RecipeIngredientResponse> ingredients,
-        boolean shared
+        boolean shared,
+        List<String> dietaryLabels
 ) {}

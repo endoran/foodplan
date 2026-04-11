@@ -16,5 +16,6 @@ public record PinnedRecipeResponse(
         boolean hasUpdate,
         Integer latestVersion,
         boolean sourceRemoved,
-        Instant pinnedAt
+        Instant pinnedAt,
+        List<String> dietaryLabels
 ) {}

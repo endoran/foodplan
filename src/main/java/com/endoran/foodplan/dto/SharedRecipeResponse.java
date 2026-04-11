@@ -14,5 +14,6 @@ public record SharedRecipeResponse(
         int version,
         Instant sharedAt,
         Instant updatedAt,
-        boolean ownedByCurrentInstance
+        boolean ownedByCurrentInstance,
+        List<String> dietaryLabels
 ) {}

@@ -51,6 +51,7 @@ public class GlobalRecipeService {
     private final RecipeRepository recipeRepository;
     private final IngredientRepository ingredientRepository;
     private final MealPlanEntryRepository mealPlanEntryRepository;
+    private final IngredientLinkerService ingredientLinkerService;
     private final boolean enabled;
     private final String instanceId;
     private final String instanceName;
@@ -65,6 +66,7 @@ public class GlobalRecipeService {
             RecipeRepository recipeRepository,
             IngredientRepository ingredientRepository,
             MealPlanEntryRepository mealPlanEntryRepository,
+            IngredientLinkerService ingredientLinkerService,
             @Qualifier("globalRecipeBookEnabled") boolean enabled,
             @Value("${foodplan.instance.id:}") String instanceId,
             @Value("${foodplan.instance.name:}") String instanceName) {
@@ -73,6 +75,7 @@ public class GlobalRecipeService {
         this.recipeRepository = recipeRepository;
         this.ingredientRepository = ingredientRepository;
         this.mealPlanEntryRepository = mealPlanEntryRepository;
+        this.ingredientLinkerService = ingredientLinkerService;
         this.enabled = enabled;
         this.instanceId = instanceId;
         this.instanceName = instanceName;
@@ -201,6 +204,8 @@ public class GlobalRecipeService {
         pin.setAttribution(shared.getAttribution());
         pin.setPinnedAt(Instant.now());
 
+        ingredientLinkerService.linkSharedIngredients(orgId, pin.getIngredients());
+
         pin = pinnedRecipeRepository.save(pin);
         log.info("Pinned shared recipe '{}' (version {})", pin.getName(), pin.getPinnedVersion());
         return toPinnedResponse(pin, shared.getVersion(), false);
@@ -237,6 +242,8 @@ public class GlobalRecipeService {
         pin.setInstructions(shared.getInstructions());
         pin.setBaseServings(shared.getBaseServings());
         pin.setIngredients(new ArrayList<>(shared.getIngredients()));
+
+        ingredientLinkerService.linkSharedIngredients(orgId, pin.getIngredients());
 
         pin = pinnedRecipeRepository.save(pin);
         log.info("Accepted update for pinned recipe '{}' (now version {})", pin.getName(), pin.getPinnedVersion());
@@ -283,7 +290,13 @@ public class GlobalRecipeService {
                 })
                 .toList());
 
-        autoCreateIngredients(orgId, recipe.getIngredients());
+        // Build source metadata map from pinned ingredients (keyed by lowercase name)
+        Map<String, SharedRecipeIngredient> sourceMetadata = pin.getIngredients().stream()
+                .collect(Collectors.toMap(
+                        si -> si.getIngredientName().toLowerCase(),
+                        si -> si,
+                        (a, b) -> a));
+        autoCreateIngredients(orgId, recipe.getIngredients(), sourceMetadata);
         recipe = recipeRepository.save(recipe);
         pinnedRecipeRepository.delete(pin);
         log.info("Copied pinned recipe '{}' as local recipe '{}'", pin.getName(), recipe.getId());
@@ -297,23 +310,60 @@ public class GlobalRecipeService {
         return new RecipeResponse(
                 recipe.getId(), recipe.getName(), recipe.getInstructions(),
                 recipe.getBaseServings(), recipe.getBaseServings(),
-                ingredients, false);
+                ingredients, false,
+                RecipeDietaryLabels.compute(recipe.getIngredients().stream()
+                        .map(ri -> ri.getIngredientName()).toList()));
     }
 
-    private void autoCreateIngredients(String orgId, List<com.endoran.foodplan.model.RecipeIngredient> ingredients) {
+    private void autoCreateIngredients(String orgId, List<com.endoran.foodplan.model.RecipeIngredient> ingredients,
+                                       Map<String, SharedRecipeIngredient> sourceMetadata) {
         for (var ri : ingredients) {
             if (ri.getIngredientId() != null && !ri.getIngredientId().isBlank()) continue;
             var existing = ingredientRepository.findByOrgIdAndNameIgnoreCase(orgId, ri.getIngredientName());
             if (existing.isPresent()) {
                 ri.setIngredientId(existing.get().getId());
             } else {
-                var inferred = IngredientCategoryInference.infer(ri.getIngredientName());
                 Ingredient newIng = new Ingredient();
                 newIng.setOrgId(orgId);
                 newIng.setName(ri.getIngredientName());
-                newIng.setStorageCategory(inferred.storage());
-                newIng.setGroceryCategory(inferred.grocery());
-                newIng.setNeedsReview(true);
+
+                SharedRecipeIngredient src = sourceMetadata != null
+                        ? sourceMetadata.get(ri.getIngredientName().toLowerCase())
+                        : null;
+
+                if (src != null && src.getGroceryCategory() != null) {
+                    try {
+                        newIng.setGroceryCategory(com.endoran.foodplan.model.GroceryCategory.valueOf(src.getGroceryCategory()));
+                    } catch (IllegalArgumentException e) {
+                        newIng.setGroceryCategory(IngredientCategoryInference.infer(ri.getIngredientName()).grocery());
+                    }
+                } else {
+                    newIng.setGroceryCategory(IngredientCategoryInference.infer(ri.getIngredientName()).grocery());
+                }
+
+                if (src != null && src.getStorageCategory() != null) {
+                    try {
+                        newIng.setStorageCategory(com.endoran.foodplan.model.StorageCategory.valueOf(src.getStorageCategory()));
+                    } catch (IllegalArgumentException e) {
+                        newIng.setStorageCategory(IngredientCategoryInference.infer(ri.getIngredientName()).storage());
+                    }
+                } else {
+                    newIng.setStorageCategory(IngredientCategoryInference.infer(ri.getIngredientName()).storage());
+                }
+
+                if (src != null && src.getDietaryTags() != null && !src.getDietaryTags().isEmpty()) {
+                    java.util.Set<com.endoran.foodplan.model.DietaryTag> tags = new java.util.HashSet<>();
+                    for (String tagName : src.getDietaryTags()) {
+                        try {
+                            tags.add(com.endoran.foodplan.model.DietaryTag.valueOf(tagName));
+                        } catch (IllegalArgumentException e) {
+                            // skip unknown tags
+                        }
+                    }
+                    newIng.setDietaryTags(tags);
+                }
+
+                newIng.setNeedsReview(false);
                 newIng = ingredientRepository.save(newIng);
                 ri.setIngredientId(newIng.getId());
             }
@@ -358,39 +408,79 @@ public class GlobalRecipeService {
     }
 
     private List<SharedRecipeIngredient> toSharedIngredients(Recipe local) {
+        // Build a map of ingredientId -> Ingredient for all ingredients in this recipe
+        List<String> ingredientIds = local.getIngredients().stream()
+                .map(ri -> ri.getIngredientId())
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+        Map<String, Ingredient> ingredientMap = new java.util.HashMap<>();
+        if (!ingredientIds.isEmpty()) {
+            ingredientRepository.findAllById(ingredientIds).forEach(ing ->
+                    ingredientMap.put(ing.getId(), ing));
+        }
+
         return local.getIngredients().stream()
-                .map(ri -> new SharedRecipeIngredient(
-                        ri.getIngredientName(),
-                        ri.getMeasurement().getQuantity().doubleValue(),
-                        ri.getMeasurement().getUnit().name(),
-                        ri.getSection()))
+                .map(ri -> {
+                    Ingredient ing = ingredientMap.get(ri.getIngredientId());
+                    Set<String> tags = Collections.emptySet();
+                    String grocery = null;
+                    String storage = null;
+                    if (ing != null) {
+                        if (ing.getDietaryTags() != null && !ing.getDietaryTags().isEmpty()) {
+                            tags = ing.getDietaryTags().stream()
+                                    .map(Enum::name)
+                                    .collect(Collectors.toSet());
+                        }
+                        if (ing.getGroceryCategory() != null) {
+                            grocery = ing.getGroceryCategory().name();
+                        }
+                        if (ing.getStorageCategory() != null) {
+                            storage = ing.getStorageCategory().name();
+                        }
+                    }
+                    return new SharedRecipeIngredient(
+                            ri.getIngredientName(),
+                            ri.getMeasurement().getQuantity().doubleValue(),
+                            ri.getMeasurement().getUnit().name(),
+                            ri.getSection(),
+                            tags, grocery, storage);
+                })
                 .toList();
     }
 
     private SharedRecipeResponse toSharedResponse(SharedRecipe shared) {
         List<SharedRecipeIngredientResponse> ingredients = shared.getIngredients().stream()
                 .map(i -> new SharedRecipeIngredientResponse(
-                        i.getIngredientName(), i.getQuantity(), i.getUnit(), i.getSection()))
+                        i.getIngredientName(), i.getQuantity(), i.getUnit(), i.getSection(),
+                        i.getDietaryTags(), i.getIngredientId(),
+                        i.getGroceryCategory(), i.getStorageCategory()))
                 .toList();
         return new SharedRecipeResponse(
                 shared.getId(), shared.getName(), shared.getInstructions(),
                 shared.getBaseServings(), ingredients, shared.getAttribution(),
                 shared.getSourceInstanceName(), shared.getVersion(),
                 shared.getSharedAt(), shared.getUpdatedAt(),
-                instanceId.equals(shared.getSourceInstanceId()));
+                instanceId.equals(shared.getSourceInstanceId()),
+                RecipeDietaryLabels.compute(shared.getIngredients().stream()
+                        .map(i -> i.getIngredientName()).toList()));
     }
 
     private PinnedRecipeResponse toPinnedResponse(PinnedRecipe pin, Integer latestVersion, boolean sourceRemoved) {
         boolean hasUpdate = !sourceRemoved && latestVersion != null && latestVersion > pin.getPinnedVersion();
         List<SharedRecipeIngredientResponse> ingredients = pin.getIngredients().stream()
                 .map(i -> new SharedRecipeIngredientResponse(
-                        i.getIngredientName(), i.getQuantity(), i.getUnit(), i.getSection()))
+                        i.getIngredientName(), i.getQuantity(), i.getUnit(), i.getSection(),
+                        i.getDietaryTags(), i.getIngredientId(),
+                        i.getGroceryCategory(), i.getStorageCategory()))
                 .toList();
         return new PinnedRecipeResponse(
                 pin.getId(), pin.getSharedRecipeId(), pin.getName(),
                 pin.getInstructions(), pin.getBaseServings(), ingredients,
                 pin.getAttribution(), pin.getSourceInstanceName(),
                 pin.getPinnedVersion(), hasUpdate, latestVersion,
-                sourceRemoved, pin.getPinnedAt());
+                sourceRemoved, pin.getPinnedAt(),
+                RecipeDietaryLabels.compute(pin.getIngredients().stream()
+                        .map(i -> i.getIngredientName()).toList()));
     }
 }

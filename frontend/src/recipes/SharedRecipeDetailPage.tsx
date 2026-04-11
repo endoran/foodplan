@@ -91,6 +91,20 @@ export function SharedRecipeDetailPage() {
         </div>
       )}
 
+      {recipe.dietaryLabels?.length > 0 && (
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          {recipe.dietaryLabels.map(label => (
+            <span key={label} style={{
+              fontSize: '0.8rem', padding: '0.2rem 0.6rem',
+              borderRadius: '999px', background: '#16a34a',
+              color: 'white', fontWeight: 500,
+            }}>
+              {label}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="section">
         <h2>Ingredients</h2>
         {recipe.ingredients.length === 0 ? (

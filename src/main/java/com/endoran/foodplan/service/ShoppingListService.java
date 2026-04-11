@@ -27,17 +27,20 @@ public class ShoppingListService {
     private final IngredientRepository ingredientRepository;
     private final InventoryItemRepository inventoryItemRepository;
     private final PinnedRecipeRepository pinnedRecipeRepository;
+    private final IngredientLinkerService ingredientLinkerService;
 
     public ShoppingListService(MealPlanEntryRepository mealPlanEntryRepository,
                                 RecipeRepository recipeRepository,
                                 IngredientRepository ingredientRepository,
                                 InventoryItemRepository inventoryItemRepository,
-                                PinnedRecipeRepository pinnedRecipeRepository) {
+                                PinnedRecipeRepository pinnedRecipeRepository,
+                                IngredientLinkerService ingredientLinkerService) {
         this.mealPlanEntryRepository = mealPlanEntryRepository;
         this.recipeRepository = recipeRepository;
         this.ingredientRepository = ingredientRepository;
         this.inventoryItemRepository = inventoryItemRepository;
         this.pinnedRecipeRepository = pinnedRecipeRepository;
+        this.ingredientLinkerService = ingredientLinkerService;
     }
 
     public ShoppingListResponse generate(String orgId, LocalDate from, LocalDate to) {
@@ -162,21 +165,35 @@ public class ShoppingListService {
 
     private void accumulatePinnedDemand(Map<String, DemandAccumulator> demand,
                                          PinnedRecipe pin, int servings) {
+        // Lazy backfill: link ingredients if any are missing ingredientId
+        if (ingredientLinkerService.needsLinking(pin.getIngredients())) {
+            ingredientLinkerService.linkSharedIngredients(pin.getOrgId(), pin.getIngredients());
+            pinnedRecipeRepository.save(pin);
+        }
+
         BigDecimal scaleFactor = BigDecimal.valueOf(servings)
                 .divide(BigDecimal.valueOf(pin.getBaseServings()), 10, RoundingMode.HALF_UP);
 
         for (SharedRecipeIngredient si : pin.getIngredients()) {
-            MeasurementUnit unit = MeasurementUnit.valueOf(si.getUnit());
+            MeasurementUnit unit;
+            try {
+                unit = MeasurementUnit.valueOf(si.getUnit());
+            } catch (IllegalArgumentException e) {
+                continue; // skip unknown units
+            }
             BigDecimal scaledQty = BigDecimal.valueOf(si.getQuantity()).multiply(scaleFactor);
             UnitConverter.UnitFamily family = UnitConverter.getFamily(unit);
 
-            String idPart = "name:" + si.getIngredientName();
+            // Use ingredientId when available (enables consolidation with local recipes)
+            String idPart = si.getIngredientId() != null
+                    ? si.getIngredientId()
+                    : "name:" + si.getIngredientName();
             String key = family == UnitConverter.UnitFamily.NONE
                     ? idPart + ":" + unit.name()
                     : idPart + ":" + family.name();
 
             demand.computeIfAbsent(key, k -> new DemandAccumulator(
-                    null, si.getIngredientName(), family, unit
+                    si.getIngredientId(), si.getIngredientName(), family, unit
             )).add(scaledQty, unit);
         }
     }

@@ -22,6 +22,7 @@ export interface Recipe {
   servings: number;
   ingredients: RecipeIngredient[];
   shared?: boolean;
+  dietaryLabels?: string[];
 }
 
 export interface Ingredient {
