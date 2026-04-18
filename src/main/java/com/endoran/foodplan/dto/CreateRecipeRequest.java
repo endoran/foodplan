@@ -11,5 +11,7 @@ public record CreateRecipeRequest(
         @NotBlank @Size(min = 1, max = 200) String name,
         String instructions,
         @Min(1) int baseServings,
-        @Valid List<RecipeIngredientRequest> ingredients
+        @Valid List<RecipeIngredientRequest> ingredients,
+        String scanSessionId,
+        Integer scanRecipeIndex
 ) {}

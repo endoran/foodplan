@@ -4,6 +4,7 @@ import com.endoran.foodplan.dto.CreateRecipeRequest;
 import com.endoran.foodplan.dto.ImportRecipeRequest;
 import com.endoran.foodplan.dto.ImportedRecipePreview;
 import com.endoran.foodplan.dto.RecipeResponse;
+import com.endoran.foodplan.dto.ScanResult;
 import com.endoran.foodplan.dto.UpdateRecipeRequest;
 import com.endoran.foodplan.service.RecipeImportException;
 import com.endoran.foodplan.service.RecipeImportService;
@@ -109,11 +110,13 @@ public class RecipeController {
     }
 
     @PostMapping(value = "/scan", consumes = "multipart/form-data")
-    public ResponseEntity<ImportedRecipePreview> scanFile(
+    public ResponseEntity<ScanResult> scanFile(
+            @AuthenticationPrincipal Jwt jwt,
             @RequestParam("file") MultipartFile file) {
         try {
-            ImportedRecipePreview preview = recipeScanService.scanFile(file);
-            return ResponseEntity.ok(preview);
+            String orgId = jwt.getClaimAsString("orgId");
+            ScanResult result = recipeScanService.scanFile(file, orgId);
+            return ResponseEntity.ok(result);
         } catch (RecipeImportException ex) {
             throw ex;
         } catch (Exception ex) {

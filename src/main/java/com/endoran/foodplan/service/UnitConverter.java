@@ -26,9 +26,15 @@ public final class UnitConverter {
         TO_BASE.put(MeasurementUnit.QUART, new BigDecimal("192"));
         TO_BASE.put(MeasurementUnit.HALF_GALLON, new BigDecimal("384"));
         TO_BASE.put(MeasurementUnit.GALLON, new BigDecimal("768"));
+        // Metric volume → TSP (1 tsp ≈ 4.929 ml)
+        TO_BASE.put(MeasurementUnit.ML, new BigDecimal("0.2029"));
+        TO_BASE.put(MeasurementUnit.L, new BigDecimal("202.884"));
         // Weight → OZ
         TO_BASE.put(MeasurementUnit.OZ, BigDecimal.ONE);
         TO_BASE.put(MeasurementUnit.LBS, new BigDecimal("16"));
+        // Metric weight → OZ (1 oz ≈ 28.3495 g)
+        TO_BASE.put(MeasurementUnit.G, new BigDecimal("0.03527"));
+        TO_BASE.put(MeasurementUnit.KG, new BigDecimal("35.274"));
     }
 
     private static final Map<MeasurementUnit, UnitFamily> FAMILIES = new EnumMap<>(MeasurementUnit.class);
@@ -42,8 +48,12 @@ public final class UnitConverter {
         FAMILIES.put(MeasurementUnit.QUART, UnitFamily.VOLUME);
         FAMILIES.put(MeasurementUnit.HALF_GALLON, UnitFamily.VOLUME);
         FAMILIES.put(MeasurementUnit.GALLON, UnitFamily.VOLUME);
+        FAMILIES.put(MeasurementUnit.ML, UnitFamily.VOLUME);
+        FAMILIES.put(MeasurementUnit.L, UnitFamily.VOLUME);
         FAMILIES.put(MeasurementUnit.OZ, UnitFamily.WEIGHT);
         FAMILIES.put(MeasurementUnit.LBS, UnitFamily.WEIGHT);
+        FAMILIES.put(MeasurementUnit.G, UnitFamily.WEIGHT);
+        FAMILIES.put(MeasurementUnit.KG, UnitFamily.WEIGHT);
     }
 
     // Ordered largest → smallest for readable output (grocery-friendly units only)

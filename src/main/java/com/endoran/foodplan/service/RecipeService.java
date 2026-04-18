@@ -1,6 +1,8 @@
 package com.endoran.foodplan.service;
 
 import com.endoran.foodplan.dto.CreateRecipeRequest;
+import com.endoran.foodplan.dto.ImportedIngredientPreview;
+import com.endoran.foodplan.dto.ImportedRecipePreview;
 import com.endoran.foodplan.dto.RecipeIngredientResponse;
 import com.endoran.foodplan.dto.RecipeResponse;
 import com.endoran.foodplan.dto.UpdateRecipeRequest;
@@ -8,8 +10,14 @@ import com.endoran.foodplan.model.Ingredient;
 import com.endoran.foodplan.model.Measurement;
 import com.endoran.foodplan.model.Recipe;
 import com.endoran.foodplan.model.RecipeIngredient;
+import com.endoran.foodplan.model.ScanSession;
+import com.endoran.foodplan.model.TrainingPair;
 import com.endoran.foodplan.repository.IngredientRepository;
 import com.endoran.foodplan.repository.RecipeRepository;
+import com.endoran.foodplan.repository.ScanSessionRepository;
+import com.endoran.foodplan.repository.TrainingPairRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -19,17 +27,26 @@ import java.math.RoundingMode;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class RecipeService {
 
+    private static final Logger log = LoggerFactory.getLogger(RecipeService.class);
+
     private final RecipeRepository recipeRepository;
     private final IngredientRepository ingredientRepository;
+    private final ScanSessionRepository scanSessionRepository;
+    private final TrainingPairRepository trainingPairRepository;
     private GlobalRecipeService globalRecipeService;
 
-    public RecipeService(RecipeRepository recipeRepository, IngredientRepository ingredientRepository) {
+    public RecipeService(RecipeRepository recipeRepository, IngredientRepository ingredientRepository,
+                         ScanSessionRepository scanSessionRepository, TrainingPairRepository trainingPairRepository) {
         this.recipeRepository = recipeRepository;
         this.ingredientRepository = ingredientRepository;
+        this.scanSessionRepository = scanSessionRepository;
+        this.trainingPairRepository = trainingPairRepository;
     }
 
     @Autowired(required = false)
@@ -47,7 +64,93 @@ public class RecipeService {
         recipe.setIngredients(toIngredients(request.ingredients()));
         autoCreateIngredients(orgId, recipe.getIngredients());
         recipe = recipeRepository.save(recipe);
+
+        // Generate training pair if this recipe came from a scan
+        if (request.scanSessionId() != null) {
+            generateTrainingPair(orgId, request);
+        }
+
         return toResponse(recipe, null, orgId);
+    }
+
+    private void generateTrainingPair(String orgId, CreateRecipeRequest request) {
+        try {
+            var sessionOpt = scanSessionRepository.findById(request.scanSessionId());
+            if (sessionOpt.isEmpty()) {
+                log.warn("Scan session {} not found (expired?), skipping training pair", request.scanSessionId());
+                return;
+            }
+            ScanSession session = sessionOpt.get();
+
+            int index = request.scanRecipeIndex() != null ? request.scanRecipeIndex() : 0;
+            if (index < 0 || index >= session.getModelOutput().size()) {
+                log.warn("Scan recipe index {} out of range for session {} (has {} recipes)",
+                        index, session.getId(), session.getModelOutput().size());
+                return;
+            }
+
+            ImportedRecipePreview modelOutput = session.getModelOutput().get(index);
+
+            // Build corrected output from what the user actually saved
+            List<ImportedIngredientPreview> correctedIngredients = request.ingredients().stream()
+                    .map(ri -> new ImportedIngredientPreview(
+                            ri.section(), ri.ingredientName(),
+                            ri.quantity(), ri.unit().name(), null, null))
+                    .collect(Collectors.toList());
+            ImportedRecipePreview correctedOutput = new ImportedRecipePreview(
+                    request.name(), request.instructions(), request.baseServings(),
+                    correctedIngredients, modelOutput.sourceUrl());
+
+            boolean hasCorrections = !recipePreviewsMatch(modelOutput, correctedOutput);
+
+            TrainingPair pair = new TrainingPair();
+            pair.setOrgId(orgId);
+            pair.setScanSessionId(session.getId());
+            pair.setImageData(session.getImageData());
+            pair.setImageContentType(session.getImageContentType());
+            pair.setModelOutput(modelOutput);
+            pair.setCorrectedOutput(correctedOutput);
+            pair.setExtractionTier(session.getExtractionTier());
+            pair.setHasCorrections(hasCorrections);
+            trainingPairRepository.save(pair);
+
+            log.info("Training pair saved (session={}, corrections={}, tier={})",
+                    session.getId(), hasCorrections, session.getExtractionTier());
+
+            // Delete scan session if all recipes have been consumed
+            // For simplicity, delete after first save — multi-recipe sessions
+            // will create one pair per save call
+            scanSessionRepository.deleteById(session.getId());
+
+        } catch (Exception e) {
+            // Training pair generation should never fail the recipe save
+            log.error("Failed to generate training pair for session {}: {}",
+                    request.scanSessionId(), e.getMessage());
+        }
+    }
+
+    private boolean recipePreviewsMatch(ImportedRecipePreview original, ImportedRecipePreview corrected) {
+        if (!Objects.equals(original.name(), corrected.name())) return false;
+        if (original.baseServings() != corrected.baseServings()) return false;
+        if (!Objects.equals(original.instructions(), corrected.instructions())) return false;
+
+        List<ImportedIngredientPreview> origIngs = original.ingredients();
+        List<ImportedIngredientPreview> corrIngs = corrected.ingredients();
+        if (origIngs.size() != corrIngs.size()) return false;
+
+        for (int i = 0; i < origIngs.size(); i++) {
+            ImportedIngredientPreview o = origIngs.get(i);
+            ImportedIngredientPreview c = corrIngs.get(i);
+            if (!Objects.equals(o.name(), c.name())) return false;
+            if (!Objects.equals(o.section(), c.section())) return false;
+            if (!Objects.equals(o.unit(), c.unit())) return false;
+            if (o.quantity() != null && c.quantity() != null) {
+                if (o.quantity().compareTo(c.quantity()) != 0) return false;
+            } else if (o.quantity() != c.quantity()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public RecipeResponse getById(String orgId, String id, Integer targetServings) {
@@ -179,7 +282,6 @@ public class RecipeService {
 
     private void autoCreateIngredients(String orgId, List<RecipeIngredient> ingredients) {
         for (RecipeIngredient ri : ingredients) {
-            // Skip if already resolved
             if (ri.getIngredientId() != null && !ri.getIngredientId().isBlank()) continue;
 
             var existing = ingredientRepository.findByOrgIdAndNameIgnoreCase(
