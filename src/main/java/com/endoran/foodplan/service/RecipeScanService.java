@@ -351,7 +351,12 @@ public class RecipeScanService {
             pb.redirectErrorStream(true);
             Process proc = pb.start();
             String output = new String(proc.getInputStream().readAllBytes());
-            proc.waitFor();
+            boolean finished = proc.waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
+            if (!finished) {
+                proc.destroyForcibly();
+                log.debug("OSD process timed out after 10s");
+                return 0;
+            }
 
             return parseOsdRotation(output);
         } catch (Exception e) {
