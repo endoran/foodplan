@@ -179,22 +179,31 @@ public class RecipeScanService {
             BufferedImage img = ImageIO.read(new java.io.ByteArrayInputStream(imageBytes));
             if (img == null) return imageBytes;
 
+            boolean modified = false;
+
             // Use Tesseract OSD to detect text orientation
-            BufferedImage gray = preprocessForOcr(img);
-            BufferedImage corrected = detectAndFixRotation(gray);
-            if (corrected != gray) {
-                log.info("OSD detected rotation for vision — applying correction");
-                img = detectAndFixRotation(img);
+            int osdRotation = detectRotationDegrees(img);
+            if (osdRotation != 0) {
+                log.info("OSD detected {}° rotation for vision — correcting", osdRotation);
+                img = rotateImage(img, Math.toRadians(osdRotation));
+                modified = true;
             }
 
-            // Fallback: rotate landscape images
-            if (img.getWidth() > img.getHeight() * 1.2) {
+            // Fallback: rotate landscape images (only if OSD didn't already rotate)
+            if (!modified && img.getWidth() > img.getHeight() * 1.2) {
                 log.info("Auto-rotating landscape image {}x{} -> portrait for vision", img.getWidth(), img.getHeight());
                 img = rotateImage(img, Math.PI / 2);
+                modified = true;
             }
 
             // Downscale for vision model — Qwen2.5-VL works best at ~1568px max dimension
-            img = downscaleForVision(img, 1568);
+            int maxDim = Math.max(img.getWidth(), img.getHeight());
+            if (maxDim > 1568) {
+                img = downscaleForVision(img, 1568);
+                modified = true;
+            }
+
+            if (!modified) return imageBytes;
 
             java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
             String format = contentType != null && contentType.contains("png") ? "png" : "jpg";
@@ -330,11 +339,12 @@ public class RecipeScanService {
         }
     }
 
-    private BufferedImage detectAndFixRotation(BufferedImage image) {
+    private int detectRotationDegrees(BufferedImage image) {
         Path tempFile = null;
         try {
+            BufferedImage gray = preprocessForOcr(image);
             tempFile = Files.createTempFile("osd-", ".png");
-            ImageIO.write(image, "png", tempFile.toFile());
+            ImageIO.write(gray, "png", tempFile.toFile());
 
             ProcessBuilder pb = new ProcessBuilder(
                     "tesseract", tempFile.toString(), "stdout", "--psm", "0");
@@ -343,19 +353,22 @@ public class RecipeScanService {
             String output = new String(proc.getInputStream().readAllBytes());
             proc.waitFor();
 
-            int rotation = parseOsdRotation(output);
-            if (rotation != 0) {
-                log.info("OSD detected Rotate:{} — applying correction", rotation);
-                double radians = Math.toRadians(rotation);
-                return rotateImage(image, radians);
-            }
-            return image;
+            return parseOsdRotation(output);
         } catch (Exception e) {
             log.debug("OSD rotation detection failed (non-fatal): {}", e.getMessage());
-            return image;
+            return 0;
         } finally {
             try { if (tempFile != null) Files.deleteIfExists(tempFile); } catch (Exception ignored) {}
         }
+    }
+
+    private BufferedImage detectAndFixRotation(BufferedImage image) {
+        int rotation = detectRotationDegrees(image);
+        if (rotation != 0) {
+            log.info("OSD detected Rotate:{} — applying correction", rotation);
+            return rotateImage(image, Math.toRadians(rotation));
+        }
+        return image;
     }
 
     private int parseOsdRotation(String osdOutput) {
