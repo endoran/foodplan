@@ -61,6 +61,12 @@ public class OllamaRecipeExtractor {
             Ingredient names are NEVER sections. A section groups multiple ingredients under a sub-recipe label. If no clear section headers exist, set section to null.
             - Valid units (MUST be quoted strings in JSON): "TSP", "TBSP", "CUP", "PINT", "QUART", "GALLON", "HALF_GALLON", "FL_OZ", "WHOLE", "LBS", "OZ", "PINCH", "PIECE", "G", "ML", "KG", "L"
             - Common abbreviations: c./C. = CUP, lb./lbs. = LBS, tsp./t. = TSP, tbsp./T. = TBSP, oz. = OZ, pkg. = PIECE, env. = PIECE, pt. = PINT, qt. = QUART
+            - CRITICAL unit abbreviation rules for HANDWRITTEN recipes: \
+            A lowercase "t" or "t." before or after a number ALWAYS means TSP. \
+            An uppercase "T" or "T." before or after a number ALWAYS means TBSP. \
+            A lowercase "c" or "c." ALWAYS means CUP. \
+            Examples: "1 t salt" = 1 TSP salt, "2 T butter" = 2 TBSP butter, "1c milk" = 1 CUP milk, "1/2 c flour" = 0.5 CUP flour. \
+            NEVER map these to WHOLE — they are always measurement abbreviations.
             - Use WHOLE for items counted by number (e.g., "3 eggs" -> quantity 3, unit WHOLE)
             - Use PINCH for "doonks", dashes, or pinches
             - NAME = shopping-list item. Strip ALL prep verbs (peeled, chopped, minced, sliced, diced, grated, beaten, etc.)
@@ -100,6 +106,9 @@ public class OllamaRecipeExtractor {
             Map.entry("CUPS", "CUP"), Map.entry("PINTS", "PINT"),
             Map.entry("QUARTS", "QUART"), Map.entry("GALLONS", "GALLON"));
 
+    // Unit abbreviation rules are intentionally duplicated between VISION_PROMPT and RULES:
+    // vision models need critical rules reinforced in the immediate prompt context, not just in
+    // a distant shared rules section, to reliably apply them.
     private static final String VISION_PROMPT = """
             You are a recipe extraction assistant. Analyze this photo of a recipe card or page and extract ALL recipes as JSON.
 
@@ -110,8 +119,17 @@ public class OllamaRecipeExtractor {
             - RECIPE TITLE: Look for the most prominent text (larger, bold, decorative font). \
             Ignore small diet/lifestyle tags like "NSI", "DF", "S", "E", "FP", "FRIENDLY", "KETO", "PALEO" — these are NOT the recipe name.
             - If ingredients are in two columns, read the LEFT column top-to-bottom first, then the RIGHT column
-            - Look for sub-recipe section headers like "For the Dough:", "Filling:", "Sauce:" — group ingredients under these sections
-            - For handwritten text, common abbreviations: c=cup, t/tsp=teaspoon, T/tbsp=tablespoon, lb=pound, oz=ounce, pkg=package
+            - Look for sub-recipe section headers like "For the Dough:", "Filling:", "Sauce:" — group ingredients under these sections. \
+            IMPORTANT: Individual ingredient names (butter, milk, eggs, garlic, etc.) are NEVER section names. \
+            A section is a sub-recipe label that groups multiple ingredients (e.g., "Marinade", "Sauce", "Dough"). \
+            If there are no clear multi-ingredient section headers, set section to null for ALL ingredients.
+            - For handwritten text, UNIT ABBREVIATION is CRITICAL: \
+            lowercase "t" or "t." = TSP (teaspoon), uppercase "T" or "T." = TBSP (tablespoon), \
+            "c" or "c." = CUP, "lb" = LBS, "oz" = OZ, "pkg" = PIECE. \
+            Example: "1 t salt" = {"quantity": 1, "unit": "TSP"}, "2 T butter" = {"quantity": 2, "unit": "TBSP"}, "1c milk" = {"quantity": 1, "unit": "CUP"}. \
+            NEVER use WHOLE when a measurement abbreviation is present.
+            - If a recipe card has multiple columns for different serving sizes (single/double/triple/quad), \
+            extract ONLY the first (smallest) column values
             - "Makes X" or "Serves X" indicates baseServings
             """ + RECIPE_SCHEMA + "\n\n" + RULES;
 

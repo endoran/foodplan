@@ -184,8 +184,16 @@ public class RecipeScanService {
     }
 
     private static boolean hasUsableRecipes(List<ImportedRecipePreview> recipes) {
-        return recipes != null && !recipes.isEmpty()
-                && recipes.stream().anyMatch(r -> r.ingredients() != null && !r.ingredients().isEmpty());
+        if (recipes == null || recipes.isEmpty()) return false;
+        return recipes.stream().anyMatch(r -> {
+            if (r.ingredients() == null || r.ingredients().isEmpty()) return false;
+            int total = r.ingredients().size();
+            if (total <= 2) return true;
+            long wholeCount = r.ingredients().stream()
+                    .filter(i -> "WHOLE".equals(i.unit()))
+                    .count();
+            return wholeCount * 4 < total * 3;
+        });
     }
 
     private ScanResult saveScanSession(String orgId, byte[] imageBytes, String imageContentType,
