@@ -106,6 +106,9 @@ public class OllamaRecipeExtractor {
             Map.entry("CUPS", "CUP"), Map.entry("PINTS", "PINT"),
             Map.entry("QUARTS", "QUART"), Map.entry("GALLONS", "GALLON"));
 
+    // Unit abbreviation rules are intentionally duplicated between VISION_PROMPT and RULES:
+    // vision models need critical rules reinforced in the immediate prompt context, not just in
+    // a distant shared rules section, to reliably apply them.
     private static final String VISION_PROMPT = """
             You are a recipe extraction assistant. Analyze this photo of a recipe card or page and extract ALL recipes as JSON.
 

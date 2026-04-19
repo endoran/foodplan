@@ -187,11 +187,12 @@ public class RecipeScanService {
         if (recipes == null || recipes.isEmpty()) return false;
         return recipes.stream().anyMatch(r -> {
             if (r.ingredients() == null || r.ingredients().isEmpty()) return false;
+            int total = r.ingredients().size();
+            if (total <= 2) return true;
             long wholeCount = r.ingredients().stream()
                     .filter(i -> "WHOLE".equals(i.unit()))
                     .count();
-            // If >75% of ingredients are WHOLE, the model likely failed to read units
-            return wholeCount <= r.ingredients().size() * 0.75;
+            return wholeCount * 4 < total * 3;
         });
     }
 
