@@ -164,7 +164,7 @@ public class OllamaRecipeExtractor {
     public OllamaRecipeExtractor(
             @Value("${ollama.host:}") String host,
             @Value("${ollama.port:11434}") int port,
-            @Value("${ollama.vision-model:qwen2.5vl:7b}") String visionModel,
+            @Value("${ollama.vision-model:qwen2.5vl:32b}") String visionModel,
             @Value("${ollama.text-model:qwen2.5:32b-instruct-q4_K_M}") String textModel,
             @Value("${ollama.timeout:180}") int timeout,
             ObjectMapper objectMapper,
@@ -229,7 +229,7 @@ public class OllamaRecipeExtractor {
                 "messages", List.of(message),
                 "stream", false,
                 "think", false,
-                "options", Map.of("temperature", 0.1, "num_predict", 8192));
+                "options", Map.of("temperature", 0.1, "num_predict", 8192, "num_ctx", 8192));
 
         return callOllama(body);
     }
@@ -245,7 +245,7 @@ public class OllamaRecipeExtractor {
                     "messages", List.of(message),
                     "stream", false,
                     "think", false,
-                    "options", Map.of("temperature", 0.1, "num_predict", 8192));
+                    "options", Map.of("temperature", 0.1, "num_predict", 8192, "num_ctx", 8192));
 
             String json = callOllama(body);
             return parseResponse(json);
