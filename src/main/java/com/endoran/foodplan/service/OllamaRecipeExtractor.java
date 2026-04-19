@@ -293,9 +293,6 @@ public class OllamaRecipeExtractor {
             json = json.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
         }
 
-        // Fix unquoted string values (e.g., "unit": CUP → "unit": "CUP")
-        json = json.replaceAll(":\\s+([A-Z_]{1,20})([,\\s\\}\\]])", ": \"$1\"$2");
-
         List<ImportedRecipePreview> results = new ArrayList<>();
 
         // Try multi-recipe format first
@@ -317,12 +314,32 @@ public class OllamaRecipeExtractor {
             LlmRecipeResponse single = objectMapper.readValue(json, LlmRecipeResponse.class);
             ImportedRecipePreview preview = buildPreview(single);
             if (preview != null) results.add(preview);
+            return results;
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             log.debug("Single-recipe JSON parse failed: {}", e.getMessage());
-            throw new RuntimeException("Failed to parse LLM response as recipe JSON", e);
         }
 
-        return results;
+        // Repair attempt: fix unquoted enum-style values (e.g., "unit": CUP → "unit": "CUP")
+        // Only applied as fallback when standard parsing fails, to avoid corrupting valid JSON
+        String repaired = json.replaceAll("\":\\s+([A-Z][A-Z_]{0,19})\\s*([,\\}\\]])", "\": \"$1\"$2");
+        if (!repaired.equals(json)) {
+            log.info("Retrying JSON parse after quoting {} bare enum values",
+                    repaired.length() - json.length());
+            try {
+                LlmMultiRecipeResponse multi = objectMapper.readValue(repaired, LlmMultiRecipeResponse.class);
+                if (multi.recipes != null && !multi.recipes.isEmpty()) {
+                    for (LlmRecipeResponse recipe : multi.recipes) {
+                        ImportedRecipePreview preview = buildPreview(recipe);
+                        if (preview != null) results.add(preview);
+                    }
+                    return results;
+                }
+            } catch (Exception e) {
+                log.debug("Repaired multi-recipe parse also failed: {}", e.getMessage());
+            }
+        }
+
+        throw new RuntimeException("Failed to parse LLM response as recipe JSON");
     }
 
     private static final Set<String> DIET_TAGS = Set.of(
