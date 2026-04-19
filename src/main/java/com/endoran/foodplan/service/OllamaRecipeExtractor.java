@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 public class OllamaRecipeExtractor {
@@ -54,8 +55,9 @@ public class OllamaRecipeExtractor {
             - Recipes may be FULLY HANDWRITTEN — read all handwritten text carefully as recipe content
             - Only ignore handwritten text that is clearly a marginal annotation on a PRINTED recipe (checkmarks, "good!", crossed-out alternatives)
             - Two-column ingredient lists: read left column top-to-bottom, then right column top-to-bottom (do NOT read across rows)
-            - Sub-recipe sections: look for "For the X:", "Dough:", "Filling:", "Sauce:", "Marinade:", "Frosting:", "Topping:", "Crust:", "Glaze:" — use the label as the section field to group ingredients
-            - Valid units: TSP, TBSP, CUP, PINT, QUART, GALLON, HALF_GALLON, FL_OZ, WHOLE, LBS, OZ, PINCH, PIECE, G, ML, KG, L
+            - Sub-recipe sections: look for "For the X:", "Dough:", "Filling:", "Sauce:", "Marinade:", "Frosting:", "Topping:", "Crust:", "Glaze:" — use the label as the section field to group ingredients. \
+            Ingredient names are NEVER sections. A section groups multiple ingredients under a sub-recipe label. If no clear section headers exist, set section to null.
+            - Valid units (MUST be quoted strings in JSON): "TSP", "TBSP", "CUP", "PINT", "QUART", "GALLON", "HALF_GALLON", "FL_OZ", "WHOLE", "LBS", "OZ", "PINCH", "PIECE", "G", "ML", "KG", "L"
             - Common abbreviations: c./C. = CUP, lb./lbs. = LBS, tsp./t. = TSP, tbsp./T. = TBSP, oz. = OZ, pkg. = PIECE, env. = PIECE, pt. = PINT, qt. = QUART
             - Use WHOLE for items counted by number (e.g., "3 eggs" -> quantity 3, unit WHOLE)
             - Use PINCH for "doonks", dashes, or pinches
@@ -68,6 +70,34 @@ public class OllamaRecipeExtractor {
             - Ignore page numbers, book headers/footers, source attributions, and copyright notices
             - Return ONLY valid JSON, no markdown fences or extra text""";
 
+    private static final Set<String> VALID_UNITS = Set.of(
+            "TSP", "TBSP", "FL_OZ", "CUP", "PINT", "QUART", "GALLON", "HALF_GALLON",
+            "WHOLE", "LBS", "OZ", "PINCH", "PIECE", "G", "ML", "KG", "L");
+
+    private static final Map<String, String> UNIT_ALIASES = Map.ofEntries(
+            Map.entry("TEASPOON", "TSP"), Map.entry("TEASPOONS", "TSP"),
+            Map.entry("TABLESPOON", "TBSP"), Map.entry("TABLESPOONS", "TBSP"),
+            Map.entry("POUND", "LBS"), Map.entry("POUNDS", "LBS"), Map.entry("LB", "LBS"),
+            Map.entry("OUNCE", "OZ"), Map.entry("OUNCES", "OZ"),
+            Map.entry("FLUID_OUNCE", "FL_OZ"), Map.entry("FLUID_OUNCES", "FL_OZ"),
+            Map.entry("CLOVE", "WHOLE"), Map.entry("CLOVES", "WHOLE"),
+            Map.entry("HEAD", "WHOLE"), Map.entry("HEADS", "WHOLE"),
+            Map.entry("SLICE", "PIECE"), Map.entry("SLICES", "PIECE"),
+            Map.entry("PACKAGE", "PIECE"), Map.entry("PACKAGES", "PIECE"),
+            Map.entry("PKG", "PIECE"), Map.entry("ENVELOPE", "PIECE"),
+            Map.entry("CAN", "PIECE"), Map.entry("CANS", "PIECE"),
+            Map.entry("BOTTLE", "PIECE"), Map.entry("BOTTLES", "PIECE"),
+            Map.entry("BUNCH", "PIECE"), Map.entry("BUNCHES", "PIECE"),
+            Map.entry("DASH", "PINCH"), Map.entry("DASHES", "PINCH"),
+            Map.entry("DOONK", "PINCH"), Map.entry("DOONKS", "PINCH"),
+            Map.entry("GRAM", "G"), Map.entry("GRAMS", "G"),
+            Map.entry("MILLILITER", "ML"), Map.entry("MILLILITERS", "ML"),
+            Map.entry("KILOGRAM", "KG"), Map.entry("KILOGRAMS", "KG"),
+            Map.entry("LITER", "L"), Map.entry("LITERS", "L"),
+            Map.entry("GALLON_HALF", "HALF_GALLON"),
+            Map.entry("CUPS", "CUP"), Map.entry("PINTS", "PINT"),
+            Map.entry("QUARTS", "QUART"), Map.entry("GALLONS", "GALLON"));
+
     private static final String VISION_PROMPT = """
             You are a recipe extraction assistant. Analyze this photo of a recipe card or page and extract ALL recipes as JSON.
 
@@ -75,9 +105,10 @@ public class OllamaRecipeExtractor {
             - The recipe may be HANDWRITTEN, PRINTED, or a mix — read ALL text as recipe content
             - Only ignore handwritten text that is clearly a marginal annotation on a printed recipe (checkmarks, "good!", crossed-out alternatives)
             - The image may be ROTATED 90° or upside down — orient yourself by finding the recipe title first
+            - RECIPE TITLE: Look for the most prominent text (larger, bold, decorative font). \
+            Ignore small diet/lifestyle tags like "NSI", "DF", "S", "E", "FP", "FRIENDLY", "KETO", "PALEO" — these are NOT the recipe name.
             - If ingredients are in two columns, read the LEFT column top-to-bottom first, then the RIGHT column
             - Look for sub-recipe section headers like "For the Dough:", "Filling:", "Sauce:" — group ingredients under these sections
-            - Recipe title is usually in larger, bold, or underlined text at the top
             - For handwritten text, common abbreviations: c=cup, t/tsp=teaspoon, T/tbsp=tablespoon, lb=pound, oz=ounce, pkg=package
             - "Makes X" or "Serves X" indicates baseServings
             """ + RECIPE_SCHEMA + "\n\n" + RULES;
@@ -88,14 +119,24 @@ public class OllamaRecipeExtractor {
             """ + RECIPE_SCHEMA + "\n\n" + RULES + """
 
             Additional rules for OCR cleanup:
+            - RECIPE TITLE (CRITICAL): The recipe name is the most important field to get right. \
+            It is usually a descriptive phrase like "Oatmeal on the Go Cups" or "Chicken Caesar Salad". \
+            NEVER use a diet/lifestyle tag as the recipe name. These are TAGS, not recipe names: \
+            "FRIENDLY", "NSI", "DF", "S", "E", "FP", "KETO", "PALEO", "GF", "DAIRY FREE", "GLUTEN FREE", \
+            "THM", "TRIM HEALTHY", "WHOLE30", "LOW CARB", "SUGAR FREE", "VEGAN", "VEGETARIAN". \
+            If the OCR title line is garbled (e.g., "REE ERE HEE EEE"), skip it and derive the name \
+            from the recipe content: key ingredients + cooking method (e.g., oats + muffin tin = "Oatmeal Muffin Cups"). \
+            Also ignore book titles (e.g., "trim healthy table"), chapter headers, and page numbers.
             - Separate ingredients from instructions even if they are merged in the text
             - Common OCR character errors: "l"/"I" misread as "1" or vice versa (e.g., "l cup"="1 cup"), "0"/"O" swapped (e.g., "35O"="350"), "rn" misread as "m", "cl" misread as "d"
             - Common OCR word errors: "cuo"="cup", "tep"="tsp", "tbep"="tbsp", "fiour"="flour", "saIt"="salt", "buiter"="butter", "suqar"="sugar"
             - Fraction misreads: "V2"="1/2", "VA"="1/4" — also handle unicode fractions
             - Two-column merge detection: if a line has two quantities (e.g., "2 cups flour 1 tsp salt"), it is likely two ingredients merged from side-by-side columns — split them
-            - Look for sub-recipe sections: "For the Dough:", "Filling:", "Sauce:", "Marinade:" — use as section field
-            - Ignore page numbers, book headers/footers, source attributions, and non-recipe text
-            - If a recipe name seems truncated or garbled, infer it from context
+            - Look for sub-recipe sections: "For the Dough:", "Filling:", "Sauce:", "Marinade:" — use as section field. \
+            IMPORTANT: Ingredient names are NEVER section names. A section is a sub-recipe grouping that multiple \
+            ingredients belong to. If there are no clear section headers, set section to null for all ingredients.
+            - Ignore page numbers, book headers/footers, source attributions, and non-recipe text (footnotes like "FOR NSI: USE A GROCERY...")
+            - If a recipe name seems truncated or garbled, infer it from context clues (ingredients, cooking method)
 
             OCR Text:
             """;
@@ -264,8 +305,8 @@ public class OllamaRecipeExtractor {
                 }
                 return results;
             }
-        } catch (Exception ignored) {
-            // Fall through to single-recipe format
+        } catch (Exception e) {
+            log.debug("Multi-recipe parse failed (trying single): {}", e.getMessage());
         }
 
         // Fall back to single-recipe format (backward compatibility)
@@ -273,20 +314,52 @@ public class OllamaRecipeExtractor {
             LlmRecipeResponse single = objectMapper.readValue(json, LlmRecipeResponse.class);
             ImportedRecipePreview preview = buildPreview(single);
             if (preview != null) results.add(preview);
+            return results;
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new RuntimeException("Failed to parse LLM response as recipe JSON", e);
+            log.debug("Single-recipe JSON parse failed: {}", e.getMessage());
         }
 
-        return results;
+        // Repair attempt: fix unquoted enum-style values (e.g., "unit": CUP → "unit": "CUP")
+        // Only applied as fallback when standard parsing fails, to avoid corrupting valid JSON
+        String repaired = json.replaceAll("\":\\s+([A-Z][A-Z_]{0,19})\\s*([,\\}\\]])", "\": \"$1\"$2");
+        if (!repaired.equals(json)) {
+            log.info("Retrying JSON parse after quoting {} bare enum values",
+                    repaired.length() - json.length());
+            try {
+                LlmMultiRecipeResponse multi = objectMapper.readValue(repaired, LlmMultiRecipeResponse.class);
+                if (multi.recipes != null && !multi.recipes.isEmpty()) {
+                    for (LlmRecipeResponse recipe : multi.recipes) {
+                        ImportedRecipePreview preview = buildPreview(recipe);
+                        if (preview != null) results.add(preview);
+                    }
+                    return results;
+                }
+            } catch (Exception e) {
+                log.debug("Repaired multi-recipe parse also failed: {}", e.getMessage());
+            }
+        }
+
+        throw new RuntimeException("Failed to parse LLM response as recipe JSON");
     }
+
+    private static final Set<String> DIET_TAGS = Set.of(
+            "FRIENDLY", "NSI", "DF", "FP", "KETO", "PALEO", "VEGAN", "VEGETARIAN",
+            "GF", "GLUTEN FREE", "DAIRY FREE", "LOW CARB", "SUGAR FREE", "WHOLE30",
+            "S", "E", "THM", "TRIM HEALTHY", "TRIM HEALTHY MAMA");
 
     private ImportedRecipePreview buildPreview(LlmRecipeResponse llm) {
         if (llm == null || llm.name == null || llm.name.isBlank()) return null;
 
+        String recipeName = llm.name.trim();
+        if (DIET_TAGS.contains(recipeName.toUpperCase())) {
+            log.warn("LLM returned diet tag '{}' as recipe name — deriving from ingredients", recipeName);
+            recipeName = deriveNameFromIngredients(llm.ingredients);
+        }
+
         List<ImportedIngredientPreview> ingredients = new ArrayList<>();
         if (llm.ingredients != null) {
             for (LlmIngredient ing : llm.ingredients) {
-                String unit = ing.unit != null ? ing.unit.toUpperCase() : "WHOLE";
+                String unit = normalizeUnit(ing.unit);
                 String name = ing.name != null ? ing.name.trim() : "";
                 if (name.isBlank()) continue;
 
@@ -304,11 +377,39 @@ public class OllamaRecipeExtractor {
         }
 
         return new ImportedRecipePreview(
-                llm.name,
+                recipeName,
                 llm.instructions != null ? llm.instructions : "",
                 llm.baseServings > 0 ? llm.baseServings : 1,
                 ingredients,
                 "scan");
+    }
+
+    private static String deriveNameFromIngredients(List<LlmIngredient> ingredients) {
+        if (ingredients == null || ingredients.isEmpty()) return "Untitled Recipe";
+        List<String> keyIngredients = new ArrayList<>();
+        for (LlmIngredient ing : ingredients) {
+            if (ing.name == null) continue;
+            String n = ing.name.trim().toLowerCase();
+            if (n.contains("salt") || n.contains("pepper") || n.contains("oil") || n.contains("spray")
+                    || n.contains("water") || n.contains("sugar") || n.contains("flour")
+                    || n.contains("butter") || n.contains("extract") || n.contains("baking")) continue;
+            if (keyIngredients.size() < 2) {
+                String capitalized = n.substring(0, 1).toUpperCase() + n.substring(1);
+                keyIngredients.add(capitalized);
+            }
+        }
+        if (keyIngredients.isEmpty()) return "Untitled Recipe";
+        return String.join(" & ", keyIngredients) + " Recipe";
+    }
+
+    private static String normalizeUnit(String raw) {
+        if (raw == null || raw.isBlank()) return "WHOLE";
+        String upper = raw.strip().toUpperCase().replace(" ", "_");
+        if (VALID_UNITS.contains(upper)) return upper;
+        String mapped = UNIT_ALIASES.get(upper);
+        if (mapped != null) return mapped;
+        log.debug("Unmapped unit '{}', defaulting to WHOLE", raw);
+        return "WHOLE";
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
