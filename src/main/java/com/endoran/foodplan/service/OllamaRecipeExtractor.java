@@ -179,26 +179,39 @@ public class OllamaRecipeExtractor {
     public List<ImportedRecipePreview> extractFromImage(byte[] imageBytes, String mimeType) {
         if (baseUrl.isBlank()) return List.of();
         try {
-            String base64 = Base64.getEncoder().encodeToString(imageBytes);
-
-            // Native Ollama API uses "images" array with raw base64 (no data URI prefix)
-            Map<String, Object> message = Map.of(
-                    "role", "user",
-                    "content", VISION_PROMPT,
-                    "images", List.of(base64));
-            Map<String, Object> body = Map.of(
-                    "model", visionModel,
-                    "messages", List.of(message),
-                    "stream", false,
-                    "think", false,
-                    "options", Map.of("temperature", 0.1, "num_predict", 8192));
-
-            String json = callOllama(body);
-            return parseResponse(json);
+            String response = callVisionModel(imageBytes);
+            return parseResponse(response);
         } catch (Exception e) {
             log.warn("Vision extraction failed: {}", e.getMessage());
             return List.of();
         }
+    }
+
+    public String readImageAsText(byte[] imageBytes) {
+        if (baseUrl.isBlank()) return null;
+        try {
+            return callVisionModel(imageBytes);
+        } catch (Exception e) {
+            log.warn("Vision text read failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private String callVisionModel(byte[] imageBytes) throws Exception {
+        String base64 = Base64.getEncoder().encodeToString(imageBytes);
+
+        Map<String, Object> message = Map.of(
+                "role", "user",
+                "content", VISION_PROMPT,
+                "images", List.of(base64));
+        Map<String, Object> body = Map.of(
+                "model", visionModel,
+                "messages", List.of(message),
+                "stream", false,
+                "think", false,
+                "options", Map.of("temperature", 0.1, "num_predict", 8192));
+
+        return callOllama(body);
     }
 
     public List<ImportedRecipePreview> extractFromText(String ocrText) {
@@ -287,10 +300,10 @@ public class OllamaRecipeExtractor {
         throw new RuntimeException("No JSON object found in thinking text");
     }
 
-    List<ImportedRecipePreview> parseResponse(String content) {
+    public List<ImportedRecipePreview> parseResponse(String content) {
         String json = content.strip();
         if (json.startsWith("```")) {
-            json = json.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
+            json = json.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```\\s*$", "");
         }
 
         List<ImportedRecipePreview> results = new ArrayList<>();
@@ -306,7 +319,7 @@ public class OllamaRecipeExtractor {
                 return results;
             }
         } catch (Exception e) {
-            log.debug("Multi-recipe parse failed (trying single): {}", e.getMessage());
+            log.info("Multi-recipe parse failed (trying single): {}", e.getMessage());
         }
 
         // Fall back to single-recipe format (backward compatibility)
@@ -316,7 +329,7 @@ public class OllamaRecipeExtractor {
             if (preview != null) results.add(preview);
             return results;
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            log.debug("Single-recipe JSON parse failed: {}", e.getMessage());
+            log.info("Single-recipe JSON parse failed: {}", e.getMessage());
         }
 
         // Repair attempt: fix unquoted enum-style values (e.g., "unit": CUP → "unit": "CUP")
@@ -335,7 +348,7 @@ public class OllamaRecipeExtractor {
                     return results;
                 }
             } catch (Exception e) {
-                log.debug("Repaired multi-recipe parse also failed: {}", e.getMessage());
+                log.info("Repaired multi-recipe parse also failed: {}", e.getMessage());
             }
         }
 
@@ -363,7 +376,7 @@ public class OllamaRecipeExtractor {
                 String name = ing.name != null ? ing.name.trim() : "";
                 if (name.isBlank()) continue;
 
-                BigDecimal quantity = ing.quantity != null ? ing.quantity : BigDecimal.ONE;
+                BigDecimal quantity = parseQuantity(ing.quantity);
                 String rawText = quantity + " " + unit + " " + name;
 
                 ingredients.add(new ImportedIngredientPreview(
@@ -378,10 +391,42 @@ public class OllamaRecipeExtractor {
 
         return new ImportedRecipePreview(
                 recipeName,
-                llm.instructions != null ? llm.instructions : "",
+                instructionsToString(llm.instructions),
                 llm.baseServings > 0 ? llm.baseServings : 1,
                 ingredients,
                 "scan");
+    }
+
+    private static String instructionsToString(JsonNode node) {
+        if (node == null || node.isNull()) return "";
+        if (node.isTextual()) return node.asText();
+        if (node.isArray()) {
+            StringBuilder sb = new StringBuilder();
+            int step = 1;
+            for (JsonNode item : node) {
+                String text = item.isTextual() ? item.asText() : item.toString();
+                if (!text.matches("^\\d+\\.\\s.*")) {
+                    sb.append(step).append(". ");
+                }
+                sb.append(text).append("\n");
+                step++;
+            }
+            return sb.toString().strip();
+        }
+        return node.toString();
+    }
+
+    private static BigDecimal parseQuantity(JsonNode node) {
+        if (node == null || node.isNull()) return BigDecimal.ONE;
+        if (node.isNumber()) return node.decimalValue();
+        if (node.isTextual()) {
+            try {
+                return new BigDecimal(node.asText().strip());
+            } catch (NumberFormatException e) {
+                return BigDecimal.ONE;
+            }
+        }
+        return BigDecimal.ONE;
     }
 
     private static String deriveNameFromIngredients(List<LlmIngredient> ingredients) {
@@ -421,7 +466,7 @@ public class OllamaRecipeExtractor {
     record LlmRecipeResponse(
             String name,
             int baseServings,
-            String instructions,
+            JsonNode instructions,
             List<LlmIngredient> ingredients
     ) {}
 
@@ -429,7 +474,7 @@ public class OllamaRecipeExtractor {
     record LlmIngredient(
             String section,
             String name,
-            BigDecimal quantity,
+            JsonNode quantity,
             String unit,
             String prepNote
     ) {}

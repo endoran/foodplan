@@ -124,16 +124,36 @@ public class RecipeScanService {
         // Tier 1 & 2: Try LLM extraction if Ollama is available
         if (ollamaExtractor.isAvailable()) {
             // Tier 1: Vision — send photo directly to vision model
-            try {
-                List<ImportedRecipePreview> vision = ollamaExtractor.extractFromImage(visionBytes, imageContentType);
-                if (!vision.isEmpty()) {
-                    log.info("Extracted {} recipe(s) via vision LLM", vision.size());
-                    recipes = vision;
-                    tier = "VISION";
-                    return saveScanSession(orgId, imageBytes, imageContentType, recipes, tier);
+            String visionRawText = ollamaExtractor.readImageAsText(visionBytes);
+            if (visionRawText != null && !visionRawText.isBlank()) {
+                log.info("Vision raw text ({} chars): {}", visionRawText.length(),
+                        visionRawText.replace("\n", "\\n").substring(0, Math.min(200, visionRawText.length())));
+                // Try parsing vision output as JSON first
+                try {
+                    List<ImportedRecipePreview> vision = ollamaExtractor.parseResponse(visionRawText);
+                    if (!vision.isEmpty()) {
+                        log.info("Extracted {} recipe(s) via vision LLM (JSON)", vision.size());
+                        recipes = vision;
+                        tier = "VISION";
+                        return saveScanSession(orgId, imageBytes, imageContentType, recipes, tier);
+                    }
+                } catch (Exception e) {
+                    log.debug("Vision output not valid JSON: {}", e.getMessage());
                 }
-            } catch (Exception e) {
-                log.warn("Vision extraction attempt failed: {}", e.getMessage());
+
+                // Vision returned text but not JSON — feed to text LLM for structuring
+                if (visionRawText.length() > 30) {
+                    log.info("Vision returned non-JSON text ({} chars), forwarding to text LLM", visionRawText.length());
+                    List<ImportedRecipePreview> visionToText = ollamaExtractor.extractFromText(visionRawText);
+                    if (!visionToText.isEmpty()) {
+                        log.info("Extracted {} recipe(s) via vision→text LLM pipeline", visionToText.size());
+                        recipes = visionToText;
+                        tier = "VISION_TEXT";
+                        return saveScanSession(orgId, imageBytes, imageContentType, recipes, tier);
+                    }
+                }
+            } else {
+                log.info("Vision returned null/empty text");
             }
 
             // Tier 2: Text LLM — OCR first, then send text to LLM
