@@ -16,10 +16,12 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 @Component
@@ -187,13 +189,13 @@ public class OllamaRecipeExtractor {
         }
     }
 
-    public String readImageAsText(byte[] imageBytes) {
-        if (baseUrl.isBlank()) return null;
+    public Optional<String> callVisionModelRaw(byte[] imageBytes) {
+        if (baseUrl.isBlank()) return Optional.empty();
         try {
-            return callVisionModel(imageBytes);
+            return Optional.of(callVisionModel(imageBytes));
         } catch (Exception e) {
-            log.warn("Vision text read failed: {}", e.getMessage());
-            return null;
+            log.warn("Vision model call failed: {}", e.getMessage());
+            return Optional.empty();
         }
     }
 
@@ -316,10 +318,11 @@ public class OllamaRecipeExtractor {
                     ImportedRecipePreview preview = buildPreview(recipe);
                     if (preview != null) results.add(preview);
                 }
+                log.info("Parsed {} recipe(s) via multi-recipe format", results.size());
                 return results;
             }
         } catch (Exception e) {
-            log.info("Multi-recipe parse failed (trying single): {}", e.getMessage());
+            log.debug("Multi-recipe parse failed (trying single): {}", e.getMessage());
         }
 
         // Fall back to single-recipe format (backward compatibility)
@@ -327,17 +330,16 @@ public class OllamaRecipeExtractor {
             LlmRecipeResponse single = objectMapper.readValue(json, LlmRecipeResponse.class);
             ImportedRecipePreview preview = buildPreview(single);
             if (preview != null) results.add(preview);
+            log.info("Parsed {} recipe(s) via single-recipe format", results.size());
             return results;
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            log.info("Single-recipe JSON parse failed: {}", e.getMessage());
+            log.debug("Single-recipe JSON parse failed: {}", e.getMessage());
         }
 
         // Repair attempt: fix unquoted enum-style values (e.g., "unit": CUP → "unit": "CUP")
-        // Only applied as fallback when standard parsing fails, to avoid corrupting valid JSON
         String repaired = json.replaceAll("\":\\s+([A-Z][A-Z_]{0,19})\\s*([,\\}\\]])", "\": \"$1\"$2");
         if (!repaired.equals(json)) {
-            log.info("Retrying JSON parse after quoting {} bare enum values",
-                    repaired.length() - json.length());
+            log.debug("Retrying JSON parse after quoting bare enum values");
             try {
                 LlmMultiRecipeResponse multi = objectMapper.readValue(repaired, LlmMultiRecipeResponse.class);
                 if (multi.recipes != null && !multi.recipes.isEmpty()) {
@@ -345,10 +347,11 @@ public class OllamaRecipeExtractor {
                         ImportedRecipePreview preview = buildPreview(recipe);
                         if (preview != null) results.add(preview);
                     }
+                    log.info("Parsed {} recipe(s) after JSON enum repair", results.size());
                     return results;
                 }
             } catch (Exception e) {
-                log.info("Repaired multi-recipe parse also failed: {}", e.getMessage());
+                log.debug("Repaired multi-recipe parse also failed: {}", e.getMessage());
             }
         }
 
@@ -420,10 +423,40 @@ public class OllamaRecipeExtractor {
         if (node == null || node.isNull()) return BigDecimal.ONE;
         if (node.isNumber()) return node.decimalValue();
         if (node.isTextual()) {
+            String text = node.asText().strip();
+            if (text.isEmpty()) return BigDecimal.ONE;
             try {
-                return new BigDecimal(node.asText().strip());
+                return new BigDecimal(text);
+            } catch (NumberFormatException e) {
+                return parseFraction(text);
+            }
+        }
+        return BigDecimal.ONE;
+    }
+
+    private static BigDecimal parseFraction(String text) {
+        // Handle mixed fractions like "1 1/2"
+        String[] parts = text.split("\\s+");
+        BigDecimal whole = BigDecimal.ZERO;
+        String fractionPart = text;
+        if (parts.length == 2 && parts[1].contains("/")) {
+            try {
+                whole = new BigDecimal(parts[0]);
+                fractionPart = parts[1];
             } catch (NumberFormatException e) {
                 return BigDecimal.ONE;
+            }
+        }
+        if (fractionPart.contains("/")) {
+            String[] frac = fractionPart.split("/");
+            if (frac.length == 2) {
+                try {
+                    BigDecimal num = new BigDecimal(frac[0].strip());
+                    BigDecimal den = new BigDecimal(frac[1].strip());
+                    if (den.compareTo(BigDecimal.ZERO) != 0) {
+                        return whole.add(num.divide(den, 4, RoundingMode.HALF_UP));
+                    }
+                } catch (NumberFormatException ignored) {}
             }
         }
         return BigDecimal.ONE;

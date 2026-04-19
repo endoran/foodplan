@@ -25,6 +25,7 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.io.InputStream;
@@ -124,14 +125,15 @@ public class RecipeScanService {
         // Tier 1 & 2: Try LLM extraction if Ollama is available
         if (ollamaExtractor.isAvailable()) {
             // Tier 1: Vision — send photo directly to vision model
-            String visionRawText = ollamaExtractor.readImageAsText(visionBytes);
-            if (visionRawText != null && !visionRawText.isBlank()) {
+            Optional<String> visionResult = ollamaExtractor.callVisionModelRaw(visionBytes);
+            if (visionResult.isPresent() && !visionResult.get().isBlank()) {
+                String visionRawText = visionResult.get();
                 log.info("Vision raw text ({} chars): {}", visionRawText.length(),
                         visionRawText.replace("\n", "\\n").substring(0, Math.min(200, visionRawText.length())));
                 // Try parsing vision output as JSON first
                 try {
                     List<ImportedRecipePreview> vision = ollamaExtractor.parseResponse(visionRawText);
-                    if (!vision.isEmpty()) {
+                    if (hasUsableRecipes(vision)) {
                         log.info("Extracted {} recipe(s) via vision LLM (JSON)", vision.size());
                         recipes = vision;
                         tier = "VISION";
@@ -143,9 +145,9 @@ public class RecipeScanService {
 
                 // Vision returned text but not JSON — feed to text LLM for structuring
                 if (visionRawText.length() > 30) {
-                    log.info("Vision returned non-JSON text ({} chars), forwarding to text LLM", visionRawText.length());
+                    log.info("Forwarding vision text ({} chars) to text LLM", visionRawText.length());
                     List<ImportedRecipePreview> visionToText = ollamaExtractor.extractFromText(visionRawText);
-                    if (!visionToText.isEmpty()) {
+                    if (hasUsableRecipes(visionToText)) {
                         log.info("Extracted {} recipe(s) via vision→text LLM pipeline", visionToText.size());
                         recipes = visionToText;
                         tier = "VISION_TEXT";
@@ -153,7 +155,7 @@ public class RecipeScanService {
                     }
                 }
             } else {
-                log.info("Vision returned null/empty text");
+                log.info("Vision returned empty result");
             }
 
             // Tier 2: Text LLM — OCR first, then send text to LLM
@@ -179,6 +181,11 @@ public class RecipeScanService {
         recipes = List.of(parseScannedText(text));
         tier = "REGEX";
         return saveScanSession(orgId, imageBytes, imageContentType, recipes, tier);
+    }
+
+    private static boolean hasUsableRecipes(List<ImportedRecipePreview> recipes) {
+        return recipes != null && !recipes.isEmpty()
+                && recipes.stream().anyMatch(r -> r.ingredients() != null && !r.ingredients().isEmpty());
     }
 
     private ScanResult saveScanSession(String orgId, byte[] imageBytes, String imageContentType,
