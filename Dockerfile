@@ -8,7 +8,7 @@ RUN ./gradlew --no-daemon bootJar -x test
 
 FROM eclipse-temurin:21-jre
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tesseract-ocr curl && rm -rf /var/lib/apt/lists/* \
+    tesseract-ocr libheif-examples curl && rm -rf /var/lib/apt/lists/* \
     && curl -L -o /usr/share/tesseract-ocr/5/tessdata/eng.traineddata \
        https://github.com/tesseract-ocr/tessdata_best/raw/main/eng.traineddata
 ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata/

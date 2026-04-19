@@ -9,6 +9,7 @@ interface ImportedIngredient {
   quantity: number;
   unit: string;
   rawText: string;
+  prepNote?: string;
 }
 
 interface ImportedPreview {
@@ -19,6 +20,11 @@ interface ImportedPreview {
   sourceUrl: string;
 }
 
+interface ScanResponse {
+  scanSessionId: string;
+  recipes: ImportedPreview[];
+}
+
 interface IngredientPreparation {
   name: string;
   status: 'EXISTING' | 'NEW';
@@ -27,7 +33,7 @@ interface IngredientPreparation {
   shoppingListExclude: boolean;
 }
 
-const UNITS = ['TSP', 'TBSP', 'CUP', 'PINT', 'QUART', 'GALLON', 'HALF_GALLON', 'WHOLE', 'LBS', 'OZ', 'PINCH', 'PIECE'];
+const UNITS = ['TSP', 'TBSP', 'CUP', 'PINT', 'QUART', 'GALLON', 'HALF_GALLON', 'FL_OZ', 'WHOLE', 'LBS', 'OZ', 'PINCH', 'PIECE', 'G', 'ML', 'KG', 'L'];
 const STORAGE_CATEGORIES = ['PANTRY', 'FROZEN', 'FRESH', 'REFRIGERATED', 'SPICE_RACK', 'COUNTER'];
 const GROCERY_CATEGORIES = ['PRODUCE', 'MEAT', 'DAIRY', 'BAKING', 'SPICES', 'ETHNIC', 'BULK', 'CANNED', 'BAKERY', 'DELI', 'HOUSEHOLD', 'OILS_CONDIMENTS', 'FROZEN'];
 
@@ -36,24 +42,42 @@ export function RecipeScanPage() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [preview, setPreview] = useState<ImportedPreview | null>(null);
 
+  // Multi-recipe state
+  const [scanSessionId, setScanSessionId] = useState<string | null>(null);
+  const [recipes, setRecipes] = useState<ImportedPreview[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [savedIndices, setSavedIndices] = useState<Set<number>>(new Set());
+
+  // Edit state for selected recipe
   const [name, setName] = useState('');
   const [instructions, setInstructions] = useState('');
   const [baseServings, setBaseServings] = useState(1);
   const [ingredients, setIngredients] = useState<ImportedIngredient[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const [step, setStep] = useState<'edit' | 'review'>('edit');
+  const [step, setStep] = useState<'upload' | 'select' | 'edit' | 'review'>('upload');
   const [newIngredients, setNewIngredients] = useState<IngredientPreparation[]>([]);
+
+  const loadRecipe = (index: number) => {
+    const recipe = recipes[index];
+    setSelectedIndex(index);
+    setName(recipe.name);
+    setInstructions(recipe.instructions);
+    setBaseServings(recipe.baseServings);
+    setIngredients(recipe.ingredients);
+    setStep('edit');
+  };
 
   const handleScan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return;
     setError('');
     setLoading(true);
-    setPreview(null);
-    setStep('edit');
+    setRecipes([]);
+    setScanSessionId(null);
+    setSavedIndices(new Set());
+    setStep('upload');
 
     const formData = new FormData();
     formData.append('file', file);
@@ -71,12 +95,17 @@ export function RecipeScanPage() {
         throw new Error(body.error || `HTTP ${response.status}`);
       }
 
-      const data: ImportedPreview = await response.json();
-      setPreview(data);
-      setName(data.name);
-      setInstructions(data.instructions);
-      setBaseServings(data.baseServings);
-      setIngredients(data.ingredients);
+      const data: ScanResponse = await response.json();
+      setScanSessionId(data.scanSessionId);
+      setRecipes(data.recipes);
+
+      if (data.recipes.length === 0) {
+        setError('No recipes could be extracted from the image');
+      } else if (data.recipes.length === 1) {
+        loadRecipe(0);
+      } else {
+        setStep('select');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Scan failed');
     } finally {
@@ -117,7 +146,7 @@ export function RecipeScanPage() {
   };
 
   const saveRecipe = async () => {
-    const body = {
+    const body: Record<string, unknown> = {
       name,
       instructions: instructions || null,
       baseServings,
@@ -129,8 +158,27 @@ export function RecipeScanPage() {
         unit: ing.unit,
       })),
     };
+
+    // Include scan session metadata for training pair generation
+    if (scanSessionId) {
+      body.scanSessionId = scanSessionId;
+      body.scanRecipeIndex = selectedIndex;
+    }
+
     const created = await apiPost<{ id: string }>('/api/v1/recipes', body);
-    navigate(`/recipes/${created.id}`);
+
+    // Track saved recipe
+    const newSaved = new Set(savedIndices);
+    newSaved.add(selectedIndex);
+    setSavedIndices(newSaved);
+
+    // If multi-recipe and more unsaved, go back to selection
+    const unsaved = recipes.filter((_, i) => !newSaved.has(i));
+    if (recipes.length > 1 && unsaved.length > 0) {
+      setStep('select');
+    } else {
+      navigate(`/recipes/${created.id}`);
+    }
   };
 
   const handleConfirmAndSave = async () => {
@@ -168,7 +216,7 @@ export function RecipeScanPage() {
           Upload photo or PDF of recipe
           <input
             type="file"
-            accept="image/*,application/pdf"
+            accept="image/*,.heic,.heif,application/pdf"
             onChange={e => setFile(e.target.files?.[0] || null)}
             required
           />
@@ -180,9 +228,54 @@ export function RecipeScanPage() {
 
       {error && <div className="error">{error}</div>}
 
-      {step === 'edit' && preview && (
+      {/* Recipe selection step (multi-recipe) */}
+      {step === 'select' && recipes.length > 1 && (
         <div className="recipe-form">
-          <p className="muted">Scanned text extracted via OCR — review and edit below</p>
+          <h2>{recipes.length} Recipes Found</h2>
+          <p className="muted">Select a recipe to review and save.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {recipes.map((recipe, i) => (
+              <button
+                key={i}
+                className={`btn ${savedIndices.has(i) ? '' : 'btn-primary'}`}
+                style={{
+                  textAlign: 'left',
+                  padding: '1rem',
+                  opacity: savedIndices.has(i) ? 0.5 : 1,
+                }}
+                onClick={() => loadRecipe(i)}
+                disabled={savedIndices.has(i)}
+              >
+                <strong>{recipe.name}</strong>
+                <span style={{ fontSize: '0.85rem', color: '#888', marginLeft: '0.75rem' }}>
+                  {recipe.ingredients.length} ingredients
+                  {savedIndices.has(i) && ' \u2014 saved'}
+                </span>
+              </button>
+            ))}
+          </div>
+          {savedIndices.size > 0 && savedIndices.size < recipes.length && (
+            <p className="muted" style={{ marginTop: '1rem' }}>
+              {savedIndices.size} of {recipes.length} saved
+            </p>
+          )}
+          {savedIndices.size === recipes.length && (
+            <div style={{ marginTop: '1rem' }}>
+              <p className="muted">All recipes saved!</p>
+              <button className="btn" onClick={() => navigate('/recipes')}>Go to Recipes</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Edit step */}
+      {step === 'edit' && (
+        <div className="recipe-form">
+          <p className="muted">
+            {recipes.length > 1
+              ? `Editing recipe ${selectedIndex + 1} of ${recipes.length} \u2014 review and save below`
+              : 'Scanned text extracted \u2014 review and edit below'}
+          </p>
 
           <label>
             Recipe Name
@@ -241,30 +334,37 @@ export function RecipeScanPage() {
                     {groupIngs.map((ing, j) => {
                       const i = group.startIndex + j;
                       return (
-                        <div key={i} className="ingredient-row">
-                          <input
-                            type="text"
-                            value={ing.name}
-                            onChange={e => updateIngredient(i, 'name', e.target.value)}
-                            style={{ flex: 2 }}
-                            placeholder="Ingredient name"
-                          />
-                          <input
-                            type="number"
-                            value={ing.quantity}
-                            onChange={e => updateIngredient(i, 'quantity', parseFloat(e.target.value) || 0)}
-                            step="0.01"
-                            min="0"
-                            style={{ flex: 1 }}
-                          />
-                          <select
-                            value={ing.unit}
-                            onChange={e => updateIngredient(i, 'unit', e.target.value)}
-                            style={{ flex: 1 }}
-                          >
-                            {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                          </select>
-                          <button type="button" className="btn btn-danger btn-small" onClick={() => removeIngredient(i)}>X</button>
+                        <div key={i}>
+                          <div className="ingredient-row">
+                            <input
+                              type="text"
+                              value={ing.name}
+                              onChange={e => updateIngredient(i, 'name', e.target.value)}
+                              style={{ flex: 2 }}
+                              placeholder="Ingredient name"
+                            />
+                            <input
+                              type="number"
+                              value={ing.quantity}
+                              onChange={e => updateIngredient(i, 'quantity', parseFloat(e.target.value) || 0)}
+                              step="0.01"
+                              min="0"
+                              style={{ flex: 1 }}
+                            />
+                            <select
+                              value={ing.unit}
+                              onChange={e => updateIngredient(i, 'unit', e.target.value)}
+                              style={{ flex: 1 }}
+                            >
+                              {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                            <button type="button" className="btn btn-danger btn-small" onClick={() => removeIngredient(i)}>X</button>
+                          </div>
+                          {ing.prepNote && (
+                            <span style={{ fontSize: '0.8rem', color: '#888', fontStyle: 'italic', paddingLeft: '0.25rem' }}>
+                              Prep: {ing.prepNote}
+                            </span>
+                          )}
                         </div>
                       );
                     })}
@@ -279,11 +379,15 @@ export function RecipeScanPage() {
             <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
               {saving ? 'Checking ingredients...' : 'Save Recipe'}
             </button>
-            <button className="btn" onClick={() => { setPreview(null); setFile(null); }}>Discard</button>
+            {recipes.length > 1 && (
+              <button className="btn" onClick={() => setStep('select')}>Back to Selection</button>
+            )}
+            <button className="btn" onClick={() => { setRecipes([]); setScanSessionId(null); setFile(null); setStep('upload'); }}>Discard</button>
           </div>
         </div>
       )}
 
+      {/* Review new ingredients step */}
       {step === 'review' && (
         <div className="recipe-form">
           <h2>Review New Ingredients</h2>

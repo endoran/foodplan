@@ -10,8 +10,11 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +23,8 @@ import java.util.regex.Pattern;
 
 @Service
 public class RecipeImportService {
+
+    private static final Logger log = LoggerFactory.getLogger(RecipeImportService.class);
 
     private static final Pattern QTY_PATTERN = Pattern.compile(
             "^\\s*(\\d+\\s+\\d+/\\d+|\\d+(?:[./]\\d+)?)\\s*");
@@ -60,13 +65,20 @@ public class RecipeImportService {
             Map.entry("pound", "LBS"), Map.entry("pounds", "LBS"), Map.entry("lb", "LBS"),
             Map.entry("lbs", "LBS"), Map.entry("1b", "LBS"), Map.entry("1bs", "LBS"),
             Map.entry("ibs", "LBS"), Map.entry("ib", "LBS"),
-            // Can
+            // Can → WHOLE
             Map.entry("can", "WHOLE"), Map.entry("cans", "WHOLE"),
             // Pinch
             Map.entry("pinch", "PINCH"),
             // Piece
             Map.entry("piece", "PIECE"), Map.entry("pieces", "PIECE"),
-            // Descriptive units
+            // Metric
+            Map.entry("g", "G"), Map.entry("gram", "G"), Map.entry("grams", "G"),
+            Map.entry("ml", "ML"), Map.entry("milliliter", "ML"), Map.entry("milliliters", "ML"),
+            Map.entry("millilitre", "ML"), Map.entry("millilitres", "ML"),
+            Map.entry("kg", "KG"), Map.entry("kilogram", "KG"), Map.entry("kilograms", "KG"),
+            Map.entry("l", "L"), Map.entry("liter", "L"), Map.entry("liters", "L"),
+            Map.entry("litre", "L"), Map.entry("litres", "L"),
+            // Descriptive units → WHOLE
             Map.entry("whole", "WHOLE"), Map.entry("large", "WHOLE"), Map.entry("medium", "WHOLE"),
             Map.entry("small", "WHOLE"), Map.entry("clove", "WHOLE"), Map.entry("cloves", "WHOLE"),
             Map.entry("bulb", "WHOLE"), Map.entry("bunch", "WHOLE"), Map.entry("head", "WHOLE"),
@@ -85,11 +97,57 @@ public class RecipeImportService {
                 Pattern.CASE_INSENSITIVE);
     }
 
+    // Number words for descriptive prefixes like "One 3-pound chuck roast"
+    private static final Map<String, Integer> NUMBER_WORDS = Map.ofEntries(
+            Map.entry("one", 1), Map.entry("two", 2), Map.entry("three", 3),
+            Map.entry("four", 4), Map.entry("five", 5), Map.entry("six", 6),
+            Map.entry("seven", 7), Map.entry("eight", 8), Map.entry("nine", 9),
+            Map.entry("ten", 10), Map.entry("eleven", 11), Map.entry("twelve", 12),
+            Map.entry("a", 1), Map.entry("an", 1)
+    );
+
+    // Pre-processing patterns
+    private static final Pattern DASH_FRACTION = Pattern.compile("(\\d+)-(\\d+/\\d+)");
+    private static final Pattern RANGE_WITH_UNIT = Pattern.compile(
+            "(\\d+(?:\\s+\\d+/\\d+|[./]\\d+)?)-?\\s*to\\s*(\\d+(?:\\s+\\d+/\\d+|[./]\\d+)?)\\s*[- ]?(\\w+)");
+    private static final Pattern RANGE_SIMPLE = Pattern.compile(
+            "(\\d+(?:\\.\\d+)?)\\s+to\\s+(\\d+(?:\\.\\d+)?)(?=\\s)");
+    private static final Pattern PAREN_MEASUREMENT = Pattern.compile(
+            "\\((\\d+(?:[- ]\\d+/\\d+|[./]\\d+)?)\\s*-?\\s*(ounces?|oz|pounds?|lbs?|grams?|g)\\)",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern SECTION_HEADER = Pattern.compile("^([A-Z][A-Z ]+):$");
+    private static final Pattern NUMBER_WORD_PREFIX = Pattern.compile(
+            "^(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|a|an)\\s+",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern DUAL_UNIT = Pattern.compile(
+            "(\\d+(?:\\s+\\d+/\\d+|[./]\\d+)?)\\s*(cups?|tablespoons?|teaspoons?)/(\\d+)\\s*(grams?|g|ml|oz|ounces?)\\s+",
+            Pattern.CASE_INSENSITIVE);
+
+    // Post-processing patterns
+    private static final Pattern PLUS_MINUS_MOD = Pattern.compile(
+            "\\s*(?:plus|minus)\\s+(?:\\d+(?:\\s+\\d+/\\d+)?\\s+(?:tablespoons?|teaspoons?|cups?|tbsp\\.?|tsp\\.?)\\s*(?:for\\s+\\w+(?:\\s+\\w+)*)?|(?:a\\s+)?(?:little|more|extra)\\b.*)",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern PAREN_ALT_MEASURE = Pattern.compile(
+            "\\((?:\\d+[^)]*(?:ounces?|sticks?|grams?|g|oz|lbs?|pounds?|cups?|ml)|such as[^)]*|or [^)]*)\\)?",
+            Pattern.CASE_INSENSITIVE);
+    // Strips "Brand1 or qty unit Brand2" leaving just the ingredient type at the end
+    // e.g. "Diamond Crystal or 1/2 tsp. Morton kosher salt" → "kosher salt"
+    private static final Pattern BRAND_ALTERNATIVE = Pattern.compile(
+            "(?:Diamond Crystal|Morton)\\s+or\\s+(?:\\d+(?:\\s+\\d+/\\d+|/\\d+)?\\s*(?:tsp\\.?|tbsp\\.?|teaspoons?|tablespoons?)\\s*\\.?\\s*)?(?:Diamond Crystal|Morton)\\s+",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern PACKAGE_DESC = Pattern.compile(
+            "^package\\s+", Pattern.CASE_INSENSITIVE);
+
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final OllamaIngredientParser ollamaIngredientParser;
+
+    public RecipeImportService(OllamaIngredientParser ollamaIngredientParser) {
+        this.ollamaIngredientParser = ollamaIngredientParser;
+    }
 
     public ImportedRecipePreview importFromUrl(String url) throws IOException {
         Document doc = Jsoup.connect(url)
-                .userAgent("FoodPlan/1.0")
+                .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                 .timeout(10_000)
                 .get();
 
@@ -133,12 +191,45 @@ public class RecipeImportService {
         if (!type.equalsIgnoreCase("Recipe")) return null;
 
         String name = node.path("name").asText("Untitled Recipe");
+        String instructions = extractInstructions(node);
+        int servings = extractServings(node);
 
-        // Instructions
-        String instructions = "";
+        // Extract raw ingredient strings
+        List<String> rawIngredientStrings = new ArrayList<>();
+        JsonNode ingredientNode = node.path("recipeIngredient");
+        if (ingredientNode.isArray()) {
+            for (JsonNode ing : ingredientNode) {
+                String raw = ing.asText("").trim();
+                if (!raw.isEmpty()) rawIngredientStrings.add(raw);
+            }
+        }
+
+        // Try LLM-powered parsing first
+        if (ollamaIngredientParser.isAvailable()) {
+            try {
+                OllamaIngredientParser.ParsedIngredientResult llmResult =
+                        ollamaIngredientParser.parseIngredients(rawIngredientStrings, instructions);
+                if (llmResult != null && !llmResult.ingredients().isEmpty()) {
+                    log.info("LLM parsed {} ingredients from {} raw inputs", llmResult.ingredients().size(), rawIngredientStrings.size());
+                    String enrichedInstructions = llmResult.enrichedInstructions() != null
+                            ? llmResult.enrichedInstructions() : instructions;
+                    return new ImportedRecipePreview(name, enrichedInstructions, servings,
+                            llmResult.ingredients(), url);
+                }
+            } catch (Exception e) {
+                log.warn("LLM ingredient parsing failed, using regex fallback: {}", e.getMessage());
+            }
+        }
+
+        // Regex fallback
+        List<ImportedIngredientPreview> ingredients = parseIngredientsWithRegex(rawIngredientStrings);
+        return new ImportedRecipePreview(name, instructions, servings, ingredients, url);
+    }
+
+    private String extractInstructions(JsonNode node) {
         JsonNode instructionNode = node.path("recipeInstructions");
         if (instructionNode.isTextual()) {
-            instructions = instructionNode.asText();
+            return instructionNode.asText();
         } else if (instructionNode.isArray()) {
             List<String> steps = new ArrayList<>();
             int stepNum = 1;
@@ -149,84 +240,216 @@ public class RecipeImportService {
                     steps.add(stepNum++ + ". " + step.path("text").asText());
                 }
             }
-            instructions = String.join("\n", steps);
+            return String.join("\n", steps);
         }
+        return "";
+    }
 
-        // Servings
-        int servings = 1;
+    private int extractServings(JsonNode node) {
         JsonNode yieldNode = node.path("recipeYield");
         if (yieldNode.isTextual()) {
             Matcher m = Pattern.compile("(\\d+)").matcher(yieldNode.asText());
-            if (m.find()) servings = Integer.parseInt(m.group(1));
+            if (m.find()) return Integer.parseInt(m.group(1));
         } else if (yieldNode.isArray() && !yieldNode.isEmpty()) {
             Matcher m = Pattern.compile("(\\d+)").matcher(yieldNode.get(0).asText());
-            if (m.find()) servings = Integer.parseInt(m.group(1));
+            if (m.find()) return Integer.parseInt(m.group(1));
         } else if (yieldNode.isNumber()) {
-            servings = yieldNode.asInt(1);
+            return yieldNode.asInt(1);
         }
+        return 1;
+    }
 
-        // Ingredients
+    private List<ImportedIngredientPreview> parseIngredientsWithRegex(List<String> rawIngredientStrings) {
         List<ImportedIngredientPreview> ingredients = new ArrayList<>();
-        JsonNode ingredientNode = node.path("recipeIngredient");
-        if (ingredientNode.isArray()) {
-            for (JsonNode ing : ingredientNode) {
-                String raw = ing.asText("").trim();
-                if (!raw.isEmpty()) {
-                    ingredients.add(parseIngredientText(raw));
-                }
+        String currentSection = null;
+        for (String raw : rawIngredientStrings) {
+            String detectedSection = detectSection(raw);
+            if (detectedSection != null) {
+                currentSection = detectedSection;
+                continue;
             }
-        }
 
-        return new ImportedRecipePreview(name, instructions, servings, ingredients, url);
+            ImportedIngredientPreview parsed = parseIngredientText(raw);
+            if (currentSection != null && (parsed.section() == null || parsed.section().isEmpty())) {
+                parsed = new ImportedIngredientPreview(currentSection, parsed.name(), parsed.quantity(),
+                        parsed.unit(), parsed.rawText(), parsed.prepNote());
+            }
+            ingredients.add(parsed);
+        }
+        return ingredients;
+    }
+
+    private String detectSection(String raw) {
+        // "FROSTING:", "FOR THE SAUCE:", "Topping:"
+        Matcher m = SECTION_HEADER.matcher(raw.trim());
+        if (m.matches()) return titleCase(m.group(1));
+
+        // "For the X:" pattern
+        if (raw.trim().matches("(?i)^for\\s+(the\\s+)?\\w[\\w ]*:$")) {
+            String section = raw.trim().replaceFirst("(?i)^for\\s+(the\\s+)?", "").replaceAll(":$", "").trim();
+            return titleCase(section);
+        }
+        return null;
+    }
+
+    private static String titleCase(String s) {
+        if (s == null || s.isEmpty()) return s;
+        StringBuilder sb = new StringBuilder();
+        for (String word : s.toLowerCase().split("\\s+")) {
+            if (!sb.isEmpty()) sb.append(' ');
+            sb.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+        }
+        return sb.toString();
     }
 
     ImportedIngredientPreview parseIngredientText(String raw) {
-        String normalized = normalizeUnicodeFractions(raw);
-        BigDecimal quantity = BigDecimal.ONE;
-        String unit = "WHOLE";
-        String ingredientName = normalized;
+        // Step 1: Unicode fractions
+        String text = normalizeUnicodeFractions(raw);
 
-        // Extract quantity
-        Matcher qtyMatcher = QTY_PATTERN.matcher(normalized);
-        if (qtyMatcher.find()) {
-            String qtyStr = qtyMatcher.group(1);
-            quantity = parseFraction(qtyStr);
-            ingredientName = normalized.substring(qtyMatcher.end()).trim();
+        // Step 2: Normalize dash-fractions: "2-2/3" → "2 2/3"
+        text = DASH_FRACTION.matcher(text).replaceAll("$1 $2");
+
+        // Step 3: Handle dual unit formats: "3 1/3 cups/430 grams flour" → take first unit
+        Matcher dualMatcher = DUAL_UNIT.matcher(text);
+        if (dualMatcher.find()) {
+            text = dualMatcher.group(1) + " " + dualMatcher.group(2) + " " + text.substring(dualMatcher.end());
         }
 
-        // Extract unit (exact match via regex)
-        Matcher unitMatcher = UNIT_PATTERN.matcher(normalized);
-        if (unitMatcher.find()) {
-            String matchedUnit = unitMatcher.group(1).toLowerCase();
-            unit = UNIT_ALIASES.getOrDefault(matchedUnit, "WHOLE");
-            ingredientName = normalized.substring(unitMatcher.end()).trim();
-        } else if (qtyMatcher.hitEnd() || qtyMatcher.find(0)) {
-            // Fuzzy fallback: check if the first word after quantity is close to a known unit
-            String afterQty = ingredientName;
-            String[] words = afterQty.split("\\s+", 2);
-            if (words.length >= 1 && !words[0].isEmpty()) {
-                String candidate = words[0].toLowerCase().replaceAll("\\.$", "");
-                String fuzzyMatch = fuzzyMatchUnit(candidate);
-                if (fuzzyMatch != null) {
-                    unit = fuzzyMatch;
-                    ingredientName = words.length > 1 ? words[1].trim() : "";
+        // Step 4: Handle parenthetical measurements: "(28-ounce)" or "(14-1/2 ounces)"
+        // If the text starts with qty + paren measurement, extract it as the primary measurement
+        Matcher parenMatcher = PAREN_MEASUREMENT.matcher(text);
+        String parenQty = null;
+        String parenUnit = null;
+        if (parenMatcher.find()) {
+            parenQty = parenMatcher.group(1).replace("-", " ").replace("  ", " ");
+            parenUnit = parenMatcher.group(2).toLowerCase();
+            // Remove the parenthetical from text
+            text = text.substring(0, parenMatcher.start()) + text.substring(parenMatcher.end());
+            text = text.replaceAll("\\s{2,}", " ").trim();
+        }
+
+        // Step 5: Ranges — "3- to 5-pound" → "4 pound", "6 to 8 whole" → "7"
+        Matcher rangeMatcher = RANGE_WITH_UNIT.matcher(text);
+        if (rangeMatcher.find()) {
+            BigDecimal low = parseFraction(rangeMatcher.group(1).trim());
+            BigDecimal high = parseFraction(rangeMatcher.group(2).trim());
+            BigDecimal mid = low.add(high).divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);
+            String midStr = mid.stripTrailingZeros().toPlainString();
+            text = text.substring(0, rangeMatcher.start()) + midStr + " " + rangeMatcher.group(3) + text.substring(rangeMatcher.end());
+        } else {
+            Matcher simpleRange = RANGE_SIMPLE.matcher(text);
+            if (simpleRange.find()) {
+                BigDecimal low = parseFraction(simpleRange.group(1).trim());
+                BigDecimal high = parseFraction(simpleRange.group(2).trim());
+                BigDecimal mid = low.add(high).divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);
+                String midStr = mid.stripTrailingZeros().toPlainString();
+                text = text.substring(0, simpleRange.start()) + midStr + text.substring(simpleRange.end());
+            }
+        }
+
+        // Step 6: Number word prefixes: "One 3-pound" → "3 pound"
+        Matcher numWord = NUMBER_WORD_PREFIX.matcher(text);
+        if (numWord.find()) {
+            String word = numWord.group(1).toLowerCase();
+            if (NUMBER_WORDS.containsKey(word)) {
+                String rest = text.substring(numWord.end()).trim();
+                // If rest starts with a number+unit (like "3-pound"), use that
+                if (rest.matches("^\\d+.*")) {
+                    text = rest;
+                } else {
+                    // "One bay leaf" → "1 bay leaf"
+                    text = NUMBER_WORDS.get(word) + " " + rest;
                 }
             }
         }
 
-        // Clean up ingredient name
+        // Step 7: Extract quantity
+        BigDecimal quantity = BigDecimal.ONE;
+        String ingredientName = text;
+
+        Matcher qtyMatcher = QTY_PATTERN.matcher(text);
+        if (qtyMatcher.find()) {
+            String qtyStr = qtyMatcher.group(1);
+            quantity = parseFraction(qtyStr);
+            ingredientName = text.substring(qtyMatcher.end()).trim();
+        } else if (parenQty != null) {
+            // Use parenthetical quantity if no leading quantity found
+            quantity = parseFraction(parenQty);
+        }
+
+        // Step 8: Extract unit
+        String unit = "WHOLE";
+        Matcher unitMatcher = UNIT_PATTERN.matcher(text);
+        if (unitMatcher.find()) {
+            String matchedUnit = unitMatcher.group(1).toLowerCase().replaceAll("\\.$", "");
+            unit = UNIT_ALIASES.getOrDefault(matchedUnit, "WHOLE");
+            ingredientName = text.substring(unitMatcher.end()).trim();
+        } else {
+            // Try unit from the word immediately after the quantity
+            String[] words = ingredientName.split("\\s+", 2);
+            if (words.length >= 1 && !words[0].isEmpty()) {
+                String candidate = words[0].toLowerCase().replaceAll("\\.$", "");
+                // Exact match first
+                String exactMatch = UNIT_ALIASES.get(candidate);
+                if (exactMatch != null) {
+                    unit = exactMatch;
+                    ingredientName = words.length > 1 ? words[1].trim() : "";
+                } else {
+                    // Fuzzy match (but only for non-ambiguous candidates)
+                    String fuzzyMatch = fuzzyMatchUnit(candidate);
+                    if (fuzzyMatch != null) {
+                        unit = fuzzyMatch;
+                        ingredientName = words.length > 1 ? words[1].trim() : "";
+                    }
+                }
+            }
+        }
+
+        // If we had a parenthetical measurement and no better unit was found, use it
+        if (parenQty != null && "WHOLE".equals(unit) && parenUnit != null) {
+            quantity = parseFraction(parenQty);
+            String resolvedUnit = UNIT_ALIASES.get(parenUnit);
+            if (resolvedUnit == null) resolvedUnit = UNIT_ALIASES.get(parenUnit.replaceAll("s$", ""));
+            if (resolvedUnit != null) unit = resolvedUnit;
+        }
+
+        // Step 9: Strip modifiers from name: "plus 2 tablespoons", "minus 2 tablespoons"
+        ingredientName = PLUS_MINUS_MOD.matcher(ingredientName).replaceAll("");
+
+        // Step 10: Enhanced name cleanup
         ingredientName = ingredientName
-                .replaceFirst("^/\\s*", "")           // strip alternate-description separator ("4lbs / 1 Whole...")
-                .replaceFirst("^\\d+(?:[./]\\d+)?\\s+", "") // strip second quantity after separator
-                .replaceAll("^of\\s+", "")
-                .replaceAll(",.*", "")                // strip prep notes after comma
-                .trim();
+                .replaceFirst("^/\\s*", "")
+                .replaceFirst("^\\d+(?:[./]\\d+)?\\s+", "")  // strip second qty after separator
+                .replaceAll("^of\\s+", "");
+
+        // Strip parenthetical alt measurements and notes
+        ingredientName = PAREN_ALT_MEASURE.matcher(ingredientName).replaceAll("");
+
+        // Strip brand alternatives: "Diamond Crystal or 1/2 tsp. Morton kosher salt" → "kosher salt"
+        ingredientName = BRAND_ALTERNATIVE.matcher(ingredientName).replaceAll("");
+
+        // Strip "package" descriptor (the size was already extracted)
+        ingredientName = PACKAGE_DESC.matcher(ingredientName).replaceAll("");
+
+        // Strip "for <prep purpose>" clauses
+        ingredientName = ingredientName.replaceAll("\\s+for\\s+(?:tossing|serving|garnish|frying|greasing|dusting|dipping|drizzling|topping|rolling)\\b.*", "");
+
+        // Strip comma-separated prep notes
+        ingredientName = ingredientName.replaceAll(",.*", "");
+
+        // Strip trailing "to serve", "to taste", "(optional)"
+        ingredientName = ingredientName.replaceAll("\\s+to\\s+(?:serve|taste)\\b.*", "");
+        ingredientName = ingredientName.replaceAll("\\s*\\(optional\\)\\s*", "");
+
+        // Clean up whitespace and leading/trailing punctuation
+        ingredientName = ingredientName.replaceAll("\\s{2,}", " ").trim();
+        ingredientName = ingredientName.replaceAll("^[\\s,;.]+|[\\s,;.]+$", "").trim();
 
         if (ingredientName.isEmpty()) {
             ingredientName = raw;
         }
 
-        return new ImportedIngredientPreview(null, ingredientName, quantity, unit, raw);
+        return new ImportedIngredientPreview(null, ingredientName, quantity, unit, raw, null);
     }
 
     private BigDecimal parseFraction(String s) {
@@ -247,7 +470,7 @@ public class RecipeImportService {
             String[] parts = s.split("/");
             if (parts.length == 2) {
                 try {
-                    return new BigDecimal(parts[0]).divide(new BigDecimal(parts[1]), 4, java.math.RoundingMode.HALF_UP);
+                    return new BigDecimal(parts[0]).divide(new BigDecimal(parts[1]), 4, RoundingMode.HALF_UP);
                 } catch (Exception e) {
                     return BigDecimal.ONE;
                 }
@@ -262,13 +485,14 @@ public class RecipeImportService {
 
     private String fuzzyMatchUnit(String candidate) {
         if (candidate.length() < 2 || candidate.length() > 12) return null;
-        // Allow distance 2 for longer words (5+ chars), distance 1 for short abbreviations
+        // Skip single-char candidates that could be ambiguous (avoid "g" fuzzy-matching "c")
+        // Single-char exact matches are handled above; fuzzy needs 3+ chars
+        if (candidate.length() < 3) return null;
         int maxDist = candidate.length() >= 5 ? 2 : 1;
         int bestDist = Integer.MAX_VALUE;
         String bestUnit = null;
         for (Map.Entry<String, String> entry : UNIT_ALIASES.entrySet()) {
             String alias = entry.getKey();
-            // Only fuzzy-match against aliases of similar length
             if (Math.abs(alias.length() - candidate.length()) > maxDist) continue;
             int dist = editDistance(candidate, alias);
             if (dist <= maxDist && dist < bestDist) {
@@ -299,7 +523,6 @@ public class RecipeImportService {
             char c = text.charAt(i);
             String replacement = UNICODE_FRACTIONS.get(c);
             if (replacement != null) {
-                // If preceded by a digit (e.g., "1½"), insert a space so it becomes "1 1/2"
                 if (sb.length() > 0 && Character.isDigit(sb.charAt(sb.length() - 1))) {
                     sb.append(' ');
                 }

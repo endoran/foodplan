@@ -7,5 +7,6 @@ public record ImportedIngredientPreview(
         String name,
         BigDecimal quantity,
         String unit,
-        String rawText
+        String rawText,
+        String prepNote
 ) {}

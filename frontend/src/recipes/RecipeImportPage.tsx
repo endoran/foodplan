@@ -8,6 +8,8 @@ interface ImportedIngredient {
   quantity: number;
   unit: string;
   rawText: string;
+  prepNote?: string;
+  section?: string;
 }
 
 interface ImportedPreview {
@@ -26,7 +28,7 @@ interface IngredientPreparation {
   shoppingListExclude: boolean;
 }
 
-const UNITS = ['TSP', 'TBSP', 'CUP', 'PINT', 'QUART', 'GALLON', 'HALF_GALLON', 'WHOLE', 'LBS', 'OZ', 'PINCH', 'PIECE'];
+const UNITS = ['TSP', 'TBSP', 'CUP', 'PINT', 'QUART', 'GALLON', 'HALF_GALLON', 'FL_OZ', 'WHOLE', 'LBS', 'OZ', 'PINCH', 'PIECE', 'G', 'ML', 'KG', 'L'];
 const STORAGE_CATEGORIES = ['PANTRY', 'FROZEN', 'FRESH', 'REFRIGERATED', 'SPICE_RACK', 'COUNTER'];
 const GROCERY_CATEGORIES = ['PRODUCE', 'MEAT', 'DAIRY', 'BAKING', 'SPICES', 'ETHNIC', 'BULK', 'CANNED', 'BAKERY', 'DELI', 'HOUSEHOLD', 'OILS_CONDIMENTS', 'FROZEN'];
 
@@ -189,30 +191,43 @@ export function RecipeImportPage() {
             </div>
             <p className="muted">New ingredients will be reviewed in the next step.</p>
             {ingredients.map((ing, i) => (
-              <div key={i} className="ingredient-row">
-                <input
-                  type="text"
-                  value={ing.name}
-                  onChange={e => updateIngredient(i, 'name', e.target.value)}
-                  style={{ flex: 2 }}
-                  placeholder="Ingredient name"
-                />
-                <input
-                  type="number"
-                  value={ing.quantity}
-                  onChange={e => updateIngredient(i, 'quantity', parseFloat(e.target.value) || 0)}
-                  step="0.01"
-                  min="0"
-                  style={{ flex: 1 }}
-                />
-                <select
-                  value={ing.unit}
-                  onChange={e => updateIngredient(i, 'unit', e.target.value)}
-                  style={{ flex: 1 }}
-                >
-                  {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                </select>
-                <button type="button" className="btn btn-danger btn-small" onClick={() => removeIngredient(i)}>X</button>
+              <div key={i}>
+                {ing.section && (i === 0 || ingredients[i - 1]?.section !== ing.section) && (
+                  <h3 style={{ margin: '1rem 0 0.5rem', fontSize: '0.95rem', color: '#666', borderBottom: '1px solid #ddd', paddingBottom: '0.25rem' }}>
+                    {ing.section}
+                  </h3>
+                )}
+                <div className="ingredient-row">
+                  <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                    <input
+                      type="text"
+                      value={ing.name}
+                      onChange={e => updateIngredient(i, 'name', e.target.value)}
+                      placeholder="Ingredient name"
+                    />
+                    {ing.prepNote && (
+                      <span style={{ fontSize: '0.8rem', color: '#888', fontStyle: 'italic', paddingLeft: '0.25rem' }}>
+                        Prep: {ing.prepNote}
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="number"
+                    value={ing.quantity}
+                    onChange={e => updateIngredient(i, 'quantity', parseFloat(e.target.value) || 0)}
+                    step="0.01"
+                    min="0"
+                    style={{ flex: 1 }}
+                  />
+                  <select
+                    value={ing.unit}
+                    onChange={e => updateIngredient(i, 'unit', e.target.value)}
+                    style={{ flex: 1 }}
+                  >
+                    {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                  <button type="button" className="btn btn-danger btn-small" onClick={() => removeIngredient(i)}>X</button>
+                </div>
               </div>
             ))}
             {ingredients.length === 0 && <p className="muted">No ingredients parsed</p>}
