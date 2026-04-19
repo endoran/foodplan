@@ -16,10 +16,12 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 @Component
@@ -179,26 +181,39 @@ public class OllamaRecipeExtractor {
     public List<ImportedRecipePreview> extractFromImage(byte[] imageBytes, String mimeType) {
         if (baseUrl.isBlank()) return List.of();
         try {
-            String base64 = Base64.getEncoder().encodeToString(imageBytes);
-
-            // Native Ollama API uses "images" array with raw base64 (no data URI prefix)
-            Map<String, Object> message = Map.of(
-                    "role", "user",
-                    "content", VISION_PROMPT,
-                    "images", List.of(base64));
-            Map<String, Object> body = Map.of(
-                    "model", visionModel,
-                    "messages", List.of(message),
-                    "stream", false,
-                    "think", false,
-                    "options", Map.of("temperature", 0.1, "num_predict", 8192));
-
-            String json = callOllama(body);
-            return parseResponse(json);
+            String response = callVisionModel(imageBytes);
+            return parseResponse(response);
         } catch (Exception e) {
             log.warn("Vision extraction failed: {}", e.getMessage());
             return List.of();
         }
+    }
+
+    public Optional<String> callVisionModelRaw(byte[] imageBytes) {
+        if (baseUrl.isBlank()) return Optional.empty();
+        try {
+            return Optional.of(callVisionModel(imageBytes));
+        } catch (Exception e) {
+            log.warn("Vision model call failed: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private String callVisionModel(byte[] imageBytes) throws Exception {
+        String base64 = Base64.getEncoder().encodeToString(imageBytes);
+
+        Map<String, Object> message = Map.of(
+                "role", "user",
+                "content", VISION_PROMPT,
+                "images", List.of(base64));
+        Map<String, Object> body = Map.of(
+                "model", visionModel,
+                "messages", List.of(message),
+                "stream", false,
+                "think", false,
+                "options", Map.of("temperature", 0.1, "num_predict", 8192));
+
+        return callOllama(body);
     }
 
     public List<ImportedRecipePreview> extractFromText(String ocrText) {
@@ -287,10 +302,10 @@ public class OllamaRecipeExtractor {
         throw new RuntimeException("No JSON object found in thinking text");
     }
 
-    List<ImportedRecipePreview> parseResponse(String content) {
+    public List<ImportedRecipePreview> parseResponse(String content) {
         String json = content.strip();
         if (json.startsWith("```")) {
-            json = json.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "");
+            json = json.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```\\s*$", "");
         }
 
         List<ImportedRecipePreview> results = new ArrayList<>();
@@ -303,6 +318,7 @@ public class OllamaRecipeExtractor {
                     ImportedRecipePreview preview = buildPreview(recipe);
                     if (preview != null) results.add(preview);
                 }
+                log.info("Parsed {} recipe(s) via multi-recipe format", results.size());
                 return results;
             }
         } catch (Exception e) {
@@ -314,17 +330,16 @@ public class OllamaRecipeExtractor {
             LlmRecipeResponse single = objectMapper.readValue(json, LlmRecipeResponse.class);
             ImportedRecipePreview preview = buildPreview(single);
             if (preview != null) results.add(preview);
+            log.info("Parsed {} recipe(s) via single-recipe format", results.size());
             return results;
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             log.debug("Single-recipe JSON parse failed: {}", e.getMessage());
         }
 
         // Repair attempt: fix unquoted enum-style values (e.g., "unit": CUP → "unit": "CUP")
-        // Only applied as fallback when standard parsing fails, to avoid corrupting valid JSON
         String repaired = json.replaceAll("\":\\s+([A-Z][A-Z_]{0,19})\\s*([,\\}\\]])", "\": \"$1\"$2");
         if (!repaired.equals(json)) {
-            log.info("Retrying JSON parse after quoting {} bare enum values",
-                    repaired.length() - json.length());
+            log.debug("Retrying JSON parse after quoting bare enum values");
             try {
                 LlmMultiRecipeResponse multi = objectMapper.readValue(repaired, LlmMultiRecipeResponse.class);
                 if (multi.recipes != null && !multi.recipes.isEmpty()) {
@@ -332,6 +347,7 @@ public class OllamaRecipeExtractor {
                         ImportedRecipePreview preview = buildPreview(recipe);
                         if (preview != null) results.add(preview);
                     }
+                    log.info("Parsed {} recipe(s) after JSON enum repair", results.size());
                     return results;
                 }
             } catch (Exception e) {
@@ -363,7 +379,7 @@ public class OllamaRecipeExtractor {
                 String name = ing.name != null ? ing.name.trim() : "";
                 if (name.isBlank()) continue;
 
-                BigDecimal quantity = ing.quantity != null ? ing.quantity : BigDecimal.ONE;
+                BigDecimal quantity = parseQuantity(ing.quantity);
                 String rawText = quantity + " " + unit + " " + name;
 
                 ingredients.add(new ImportedIngredientPreview(
@@ -378,10 +394,72 @@ public class OllamaRecipeExtractor {
 
         return new ImportedRecipePreview(
                 recipeName,
-                llm.instructions != null ? llm.instructions : "",
+                instructionsToString(llm.instructions),
                 llm.baseServings > 0 ? llm.baseServings : 1,
                 ingredients,
                 "scan");
+    }
+
+    private static String instructionsToString(JsonNode node) {
+        if (node == null || node.isNull()) return "";
+        if (node.isTextual()) return node.asText();
+        if (node.isArray()) {
+            StringBuilder sb = new StringBuilder();
+            int step = 1;
+            for (JsonNode item : node) {
+                String text = item.isTextual() ? item.asText() : item.toString();
+                if (!text.matches("^\\d+\\.\\s.*")) {
+                    sb.append(step).append(". ");
+                }
+                sb.append(text).append("\n");
+                step++;
+            }
+            return sb.toString().strip();
+        }
+        return node.toString();
+    }
+
+    private static BigDecimal parseQuantity(JsonNode node) {
+        if (node == null || node.isNull()) return BigDecimal.ONE;
+        if (node.isNumber()) return node.decimalValue();
+        if (node.isTextual()) {
+            String text = node.asText().strip();
+            if (text.isEmpty()) return BigDecimal.ONE;
+            try {
+                return new BigDecimal(text);
+            } catch (NumberFormatException e) {
+                return parseFraction(text);
+            }
+        }
+        return BigDecimal.ONE;
+    }
+
+    private static BigDecimal parseFraction(String text) {
+        // Handle mixed fractions like "1 1/2"
+        String[] parts = text.split("\\s+");
+        BigDecimal whole = BigDecimal.ZERO;
+        String fractionPart = text;
+        if (parts.length == 2 && parts[1].contains("/")) {
+            try {
+                whole = new BigDecimal(parts[0]);
+                fractionPart = parts[1];
+            } catch (NumberFormatException e) {
+                return BigDecimal.ONE;
+            }
+        }
+        if (fractionPart.contains("/")) {
+            String[] frac = fractionPart.split("/");
+            if (frac.length == 2) {
+                try {
+                    BigDecimal num = new BigDecimal(frac[0].strip());
+                    BigDecimal den = new BigDecimal(frac[1].strip());
+                    if (den.compareTo(BigDecimal.ZERO) != 0) {
+                        return whole.add(num.divide(den, 4, RoundingMode.HALF_UP));
+                    }
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        return BigDecimal.ONE;
     }
 
     private static String deriveNameFromIngredients(List<LlmIngredient> ingredients) {
@@ -421,7 +499,7 @@ public class OllamaRecipeExtractor {
     record LlmRecipeResponse(
             String name,
             int baseServings,
-            String instructions,
+            JsonNode instructions,
             List<LlmIngredient> ingredients
     ) {}
 
@@ -429,7 +507,7 @@ public class OllamaRecipeExtractor {
     record LlmIngredient(
             String section,
             String name,
-            BigDecimal quantity,
+            JsonNode quantity,
             String unit,
             String prepNote
     ) {}
