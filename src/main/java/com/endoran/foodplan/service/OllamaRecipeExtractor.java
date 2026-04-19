@@ -164,8 +164,8 @@ public class OllamaRecipeExtractor {
     public OllamaRecipeExtractor(
             @Value("${ollama.host:}") String host,
             @Value("${ollama.port:11434}") int port,
-            @Value("${ollama.vision-model:qwen2.5vl:32b}") String visionModel,
-            @Value("${ollama.text-model:qwen2.5:32b-instruct-q4_K_M}") String textModel,
+            @Value("${ollama.vision-model:qwen3.5:9b}") String visionModel,
+            @Value("${ollama.text-model:qwen3:14b}") String textModel,
             @Value("${ollama.timeout:300}") int timeout,
             ObjectMapper objectMapper,
             RecipeImportService recipeImportService) {
