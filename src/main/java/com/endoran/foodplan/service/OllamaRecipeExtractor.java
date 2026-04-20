@@ -116,7 +116,11 @@ public class OllamaRecipeExtractor {
             - The recipe may be HANDWRITTEN, PRINTED, or a mix — read ALL text as recipe content
             - Only ignore handwritten text that is clearly a marginal annotation on a printed recipe (checkmarks, "good!", crossed-out alternatives)
             - The image may be ROTATED 90° or upside down — orient yourself by finding the recipe title first
-            - RECIPE TITLE: Look for the most prominent text (larger, bold, decorative font). \
+            - RECIPE TITLE (CRITICAL — most important field): The "name" in the JSON MUST be the exact title text \
+            printed on the card in the LARGEST or most prominent font (bold, decorative, or heading-style). \
+            Read it VERBATIM — do NOT rephrase, summarize, or derive a name from ingredients or instructions. \
+            For example, if the card says "Beef and Broccoli" at the top, the name is "Beef and Broccoli" — \
+            NOT "Stir Fry Beef" or "Flank Steak Stir Fry" (those are ingredient descriptions, not the title). \
             Ignore small diet/lifestyle tags like "NSI", "DF", "S", "E", "FP", "FRIENDLY", "KETO", "PALEO" — these are NOT the recipe name.
             - If ingredients are in two columns, read the LEFT column top-to-bottom first, then the RIGHT column
             - Look for sub-recipe section headers like "For the Dough:", "Filling:", "Sauce:" — group ingredients under these sections. \
@@ -140,7 +144,10 @@ public class OllamaRecipeExtractor {
 
             Additional rules for OCR cleanup:
             - RECIPE TITLE (CRITICAL): The recipe name is the most important field to get right. \
-            It is usually a descriptive phrase like "Oatmeal on the Go Cups" or "Chicken Caesar Salad". \
+            The name MUST be the actual title of the recipe as written in the text — usually the first \
+            prominent line before ingredients start (e.g., "Beef and Broccoli", "Oatmeal on the Go Cups"). \
+            NEVER derive the name from ingredient descriptions (e.g., do NOT use "Flank Steak Stir Fry" \
+            when the title says "Beef and Broccoli"). \
             NEVER use a diet/lifestyle tag as the recipe name. These are TAGS, not recipe names: \
             "FRIENDLY", "NSI", "DF", "S", "E", "FP", "KETO", "PALEO", "GF", "DAIRY FREE", "GLUTEN FREE", \
             "THM", "TRIM HEALTHY", "WHOLE30", "LOW CARB", "SUGAR FREE", "VEGAN", "VEGETARIAN". \
