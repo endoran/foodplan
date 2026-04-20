@@ -146,8 +146,8 @@ public class OllamaRecipeExtractor {
             - RECIPE TITLE (CRITICAL): The recipe name is the most important field to get right. \
             The name MUST be the actual title of the recipe as written in the text — usually the first \
             prominent line before ingredients start (e.g., "Beef and Broccoli", "Oatmeal on the Go Cups"). \
-            NEVER derive the name from ingredient descriptions (e.g., do NOT use "Flank Steak Stir Fry" \
-            when the title says "Beef and Broccoli"). \
+            When a readable title IS present, NEVER derive the name from ingredient descriptions \
+            (e.g., do NOT use "Flank Steak Stir Fry" when the title says "Beef and Broccoli"). \
             NEVER use a diet/lifestyle tag as the recipe name. These are TAGS, not recipe names: \
             "FRIENDLY", "NSI", "DF", "S", "E", "FP", "KETO", "PALEO", "GF", "DAIRY FREE", "GLUTEN FREE", \
             "THM", "TRIM HEALTHY", "WHOLE30", "LOW CARB", "SUGAR FREE", "VEGAN", "VEGETARIAN". \
