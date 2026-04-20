@@ -216,6 +216,13 @@ public class RecipeScanService {
 
             boolean modified = false;
 
+            // Downscale FIRST to avoid OOM on rotation of large images (e.g. 5712x4284 iPhone photos)
+            int maxDim = Math.max(img.getWidth(), img.getHeight());
+            if (maxDim > 1568) {
+                img = downscaleForVision(img, 1568);
+                modified = true;
+            }
+
             // Use Tesseract OSD to detect text orientation
             int osdRotation = detectRotationDegrees(img);
             if (osdRotation != 0) {
@@ -225,16 +232,9 @@ public class RecipeScanService {
             }
 
             // Fallback: rotate landscape images (only if OSD didn't already rotate)
-            if (!modified && img.getWidth() > img.getHeight() * 1.2) {
+            if (osdRotation == 0 && img.getWidth() > img.getHeight() * 1.2) {
                 log.info("Auto-rotating landscape image {}x{} -> portrait for vision", img.getWidth(), img.getHeight());
                 img = rotateImage(img, Math.PI / 2);
-                modified = true;
-            }
-
-            // Downscale for vision model — Qwen2.5-VL works best at ~1568px max dimension
-            int maxDim = Math.max(img.getWidth(), img.getHeight());
-            if (maxDim > 1568) {
-                img = downscaleForVision(img, 1568);
                 modified = true;
             }
 
