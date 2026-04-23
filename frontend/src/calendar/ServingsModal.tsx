@@ -10,13 +10,14 @@ interface ServingsModalProps {
 const MEAL_TYPES: MealType[] = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'];
 
 export function ServingsModal({ recipeName, onConfirm, onCancel }: ServingsModalProps) {
-  const [servings, setServings] = useState(2);
+  const [servingsText, setServingsText] = useState('2');
   const [mealType, setMealType] = useState<MealType>('DINNER');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (servings >= 1) {
-      onConfirm(servings, mealType);
+    const n = parseInt(servingsText);
+    if (!isNaN(n) && n >= 1) {
+      onConfirm(n, mealType);
     }
   };
 
@@ -38,8 +39,8 @@ export function ServingsModal({ recipeName, onConfirm, onCancel }: ServingsModal
             <input
               type="number"
               min={1}
-              value={servings}
-              onChange={e => setServings(parseInt(e.target.value) || 1)}
+              value={servingsText}
+              onChange={e => setServingsText(e.target.value)}
             />
           </label>
           <div className="btn-group">

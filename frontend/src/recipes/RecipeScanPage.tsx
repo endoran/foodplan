@@ -52,7 +52,7 @@ export function RecipeScanPage() {
   // Edit state for selected recipe
   const [name, setName] = useState('');
   const [instructions, setInstructions] = useState('');
-  const [baseServings, setBaseServings] = useState(1);
+  const [baseServingsText, setBaseServingsText] = useState('1');
   const [ingredients, setIngredients] = useState<ImportedIngredient[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -64,7 +64,7 @@ export function RecipeScanPage() {
     setSelectedIndex(index);
     setName(recipe.name);
     setInstructions(recipe.instructions);
-    setBaseServings(recipe.baseServings);
+    setBaseServingsText(String(recipe.baseServings));
     setIngredients(recipe.ingredients);
     setStep('edit');
   };
@@ -146,6 +146,12 @@ export function RecipeScanPage() {
   };
 
   const saveRecipe = async () => {
+    const baseServings = parseInt(baseServingsText);
+    if (isNaN(baseServings) || baseServings < 1) {
+      setError('Base servings must be at least 1');
+      return;
+    }
+
     const body: Record<string, unknown> = {
       name,
       instructions: instructions || null,
@@ -291,8 +297,8 @@ export function RecipeScanPage() {
             Base Servings
             <input
               type="number"
-              value={baseServings}
-              onChange={e => setBaseServings(parseInt(e.target.value) || 1)}
+              value={baseServingsText}
+              onChange={e => setBaseServingsText(e.target.value)}
               min={1}
             />
           </label>
