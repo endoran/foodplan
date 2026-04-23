@@ -2,10 +2,8 @@ export function parseFraction(input: string): number {
   const s = input.trim();
   if (!s) return NaN;
 
-  // Plain number (integer or decimal)
-  if (/^-?\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+  if (/^\d+(\.\d+)?$/.test(s)) return parseFloat(s);
 
-  // Simple fraction: "1/2", "3/4"
   const fractionMatch = s.match(/^(\d+)\s*\/\s*(\d+)$/);
   if (fractionMatch) {
     const num = parseInt(fractionMatch[1]);
@@ -13,7 +11,6 @@ export function parseFraction(input: string): number {
     return den === 0 ? NaN : num / den;
   }
 
-  // Mixed fraction: "1 1/2", "2 3/4"
   const mixedMatch = s.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/);
   if (mixedMatch) {
     const whole = parseInt(mixedMatch[1]);
@@ -22,7 +19,6 @@ export function parseFraction(input: string): number {
     return den === 0 ? NaN : whole + num / den;
   }
 
-  // Unicode fractions
   const unicodeFractions: Record<string, number> = {
     "\u00BC": 0.25, "\u00BD": 0.5, "\u00BE": 0.75,
     "\u2153": 1/3, "\u2154": 2/3, "\u2155": 0.2, "\u2156": 0.4,
@@ -30,7 +26,6 @@ export function parseFraction(input: string): number {
     "\u215B": 0.125, "\u215C": 0.375, "\u215D": 0.625, "\u215E": 0.875,
   };
 
-  // "1½" or just "½"
   for (const [char, val] of Object.entries(unicodeFractions)) {
     if (s.endsWith(char)) {
       const prefix = s.slice(0, -1).trim();

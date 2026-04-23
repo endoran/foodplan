@@ -180,7 +180,7 @@ export function RecipeFormPage() {
         unit: row.unit,
       }));
 
-    if (parsed.some(ing => isNaN(ing.quantity))) {
+    if (parsed.some(ing => isNaN(ing.quantity) || ing.quantity <= 0)) {
       setError('Invalid quantity — use a number or fraction (e.g. 1/2)');
       setLoading(false);
       return;

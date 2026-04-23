@@ -37,7 +37,7 @@ export function InventoryPage() {
     e.preventDefault();
     setError('');
     const qty = parseFraction(newQuantity);
-    if (isNaN(qty)) { setError('Invalid quantity — use a number or fraction (e.g. 1/2)'); return; }
+    if (isNaN(qty) || qty <= 0) { setError('Invalid quantity — use a number or fraction (e.g. 1/2)'); return; }
 
     try {
       await apiPost('/api/v1/inventory', {
@@ -63,9 +63,11 @@ export function InventoryPage() {
 
   const handleUpdate = async (id: string) => {
     setError('');
+    const qty = parseFraction(editQuantity);
+    if (isNaN(qty) || qty <= 0) { setError('Invalid quantity \u2014 use a number or fraction (e.g. 1/2)'); return; }
     try {
       await apiPut(`/api/v1/inventory/${id}`, {
-        quantity: parseFraction(editQuantity),
+        quantity: qty,
         unit: editUnit,
       });
       setEditId(null);

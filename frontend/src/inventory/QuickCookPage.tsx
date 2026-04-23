@@ -50,7 +50,7 @@ export function QuickCookPage() {
         unit: r.unit,
       }));
 
-    if (items.some(item => isNaN(item.quantity))) {
+    if (items.some(item => isNaN(item.quantity) || item.quantity <= 0)) {
       setError('Invalid quantity — use a number or fraction (e.g. 1/2)');
       return;
     }

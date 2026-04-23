@@ -6,7 +6,7 @@ import { formatEnum } from '../utils/formatEnum';
 
 interface ImportedIngredient {
   name: string;
-  quantity: number;
+  quantity: number | string;
   unit: string;
   rawText: string;
   prepNote?: string;
@@ -115,7 +115,7 @@ export function RecipeImportPage() {
       unit: ing.unit,
     }));
 
-    if (parsed.some(ing => isNaN(ing.quantity))) {
+    if (parsed.some(ing => isNaN(ing.quantity) || ing.quantity <= 0)) {
       setError('Invalid quantity — use a number or fraction (e.g. 1/2)');
       return;
     }
