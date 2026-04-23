@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiPost } from '../api/client';
+import { parseFraction } from '../utils/parseFraction';
 import { formatEnum } from '../utils/formatEnum';
 
 interface ImportedIngredient {
   section: string | null;
   name: string;
-  quantity: number;
+  quantity: number | string;
   unit: string;
   rawText: string;
   prepNote?: string;
@@ -152,17 +153,24 @@ export function RecipeScanPage() {
       return;
     }
 
+    const parsed = ingredients.map(ing => ({
+      section: ing.section || null,
+      ingredientId: '',
+      ingredientName: ing.name,
+      quantity: typeof ing.quantity === 'string' ? parseFraction(ing.quantity) : ing.quantity,
+      unit: ing.unit,
+    }));
+
+    if (parsed.some(ing => isNaN(ing.quantity))) {
+      setError('Invalid quantity — use a number or fraction (e.g. 1/2)');
+      return;
+    }
+
     const body: Record<string, unknown> = {
       name,
       instructions: instructions || null,
       baseServings,
-      ingredients: ingredients.map(ing => ({
-        section: ing.section || null,
-        ingredientId: '',
-        ingredientName: ing.name,
-        quantity: ing.quantity,
-        unit: ing.unit,
-      })),
+      ingredients: parsed,
     };
 
     // Include scan session metadata for training pair generation
@@ -350,11 +358,10 @@ export function RecipeScanPage() {
                               placeholder="Ingredient name"
                             />
                             <input
-                              type="number"
+                              type="text"
                               value={ing.quantity}
-                              onChange={e => updateIngredient(i, 'quantity', parseFloat(e.target.value) || 0)}
-                              step="0.01"
-                              min="0"
+                              onChange={e => updateIngredient(i, 'quantity', e.target.value)}
+                              placeholder="e.g. 1/2"
                               style={{ flex: 1 }}
                             />
                             <select

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { parseFraction } from '../utils/parseFraction';
 import { apiGet, apiPost, apiPut, apiDelete } from '../api/client';
 import type { Ingredient } from '../recipes/types';
 import type { InventoryItem } from './types';
@@ -35,10 +36,13 @@ export function InventoryPage() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    const qty = parseFraction(newQuantity);
+    if (isNaN(qty)) { setError('Invalid quantity — use a number or fraction (e.g. 1/2)'); return; }
+
     try {
       await apiPost('/api/v1/inventory', {
         ingredientId: newIngredientId,
-        quantity: parseFloat(newQuantity),
+        quantity: qty,
         unit: newUnit,
       });
       setAdding(false);
@@ -61,7 +65,7 @@ export function InventoryPage() {
     setError('');
     try {
       await apiPut(`/api/v1/inventory/${id}`, {
-        quantity: parseFloat(editQuantity),
+        quantity: parseFraction(editQuantity),
         unit: editUnit,
       });
       setEditId(null);
@@ -109,12 +113,10 @@ export function InventoryPage() {
               </td>
               <td>
                 <input
-                  type="number"
+                  type="text"
                   value={newQuantity}
                   onChange={e => setNewQuantity(e.target.value)}
-                  placeholder="Qty"
-                  step="0.01"
-                  min="0.01"
+                  placeholder="Qty (e.g. 1/2)"
                   required
                   style={{ width: '80px' }}
                 />
@@ -138,11 +140,9 @@ export function InventoryPage() {
               <td>
                 {editId === item.id ? (
                   <input
-                    type="number"
+                    type="text"
                     value={editQuantity}
                     onChange={e => setEditQuantity(e.target.value)}
-                    step="0.01"
-                    min="0.01"
                     style={{ width: '80px' }}
                   />
                 ) : item.quantity}
