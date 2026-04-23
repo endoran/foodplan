@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
-export PATH=/opt/homebrew/bin:$PATH
+
+# Portable PATH: add Homebrew if present (ARM or Intel Mac)
+[ -d /opt/homebrew/bin ] && export PATH=/opt/homebrew/bin:$PATH
+[ -d /usr/local/bin ] && export PATH=/usr/local/bin:$PATH
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
