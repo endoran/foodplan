@@ -59,8 +59,8 @@ export function RecipeScanPage() {
   const [step, setStep] = useState<'upload' | 'select' | 'edit' | 'review'>('upload');
   const [newIngredients, setNewIngredients] = useState<IngredientPreparation[]>([]);
 
-  const loadRecipe = (index: number) => {
-    const recipe = recipes[index];
+  const loadRecipe = (index: number, source?: ImportedPreview[]) => {
+    const recipe = (source || recipes)[index];
     setSelectedIndex(index);
     setName(recipe.name);
     setInstructions(recipe.instructions);
@@ -102,7 +102,7 @@ export function RecipeScanPage() {
       if (data.recipes.length === 0) {
         setError('No recipes could be extracted from the image');
       } else if (data.recipes.length === 1) {
-        loadRecipe(0);
+        loadRecipe(0, data.recipes);
       } else {
         setStep('select');
       }
