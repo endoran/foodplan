@@ -41,30 +41,35 @@ public class IngredientNormalizationService {
         List<Merge> merges = new ArrayList<>();
         int skipped = 0;
 
-        Map<String, Ingredient> canonicalMap = new HashMap<>();
+        Map<String, List<Ingredient>> groups = new HashMap<>();
 
         for (Ingredient ing : ingredients) {
             String normalized = IngredientAliasDictionary.resolveAndNormalize(ing.getName());
 
-            boolean changed = false;
             if (!ing.getName().equals(normalized)) {
                 renames.add(new Rename(ing.getId(), ing.getName(), normalized));
-                changed = true;
             }
 
             String key = normalized.toLowerCase();
-            Ingredient existing = canonicalMap.get(key);
-            if (existing == null) {
-                canonicalMap.put(key, ing);
-            } else {
-                Ingredient winner = pickWinner(existing, ing);
-                Ingredient loser = (winner == existing) ? ing : existing;
-                canonicalMap.put(key, winner);
-                merges.add(new Merge(winner.getId(), winner.getName(), loser.getId(), loser.getName(), normalized));
-                changed = true;
+            groups.computeIfAbsent(key, k -> new ArrayList<>()).add(ing);
+        }
+
+        for (Map.Entry<String, List<Ingredient>> entry : groups.entrySet()) {
+            List<Ingredient> group = entry.getValue();
+            if (group.size() < 2) {
+                if (renames.stream().noneMatch(r -> r.ingredientId.equals(group.get(0).getId()))) {
+                    skipped++;
+                }
+                continue;
             }
 
-            if (!changed) skipped++;
+            String canonicalName = IngredientAliasDictionary.resolveAndNormalize(group.get(0).getName());
+            Ingredient winner = group.stream().reduce(this::pickWinner).orElseThrow();
+
+            for (Ingredient loser : group) {
+                if (loser == winner) continue;
+                merges.add(new Merge(winner.getId(), winner.getName(), loser.getId(), loser.getName(), canonicalName));
+            }
         }
 
         if (!dryRun) {
@@ -76,13 +81,17 @@ public class IngredientNormalizationService {
                 }
             }
 
-            for (Merge merge : merges) {
-                repointReferences(orgId, merge.loserId, merge.winnerId, merge.canonicalName);
-                ingredientRepository.deleteById(merge.loserId);
-                Ingredient winner = ingredientRepository.findById(merge.winnerId).orElse(null);
-                if (winner != null && !winner.getName().equals(merge.canonicalName)) {
-                    winner.setName(merge.canonicalName);
-                    ingredientRepository.save(winner);
+            if (!merges.isEmpty()) {
+                List<InventoryItem> allInventory = inventoryItemRepository.findByOrgId(orgId);
+
+                for (Merge merge : merges) {
+                    repointReferences(orgId, merge.loserId, merge.winnerId, merge.canonicalName, allInventory);
+                    ingredientRepository.deleteById(merge.loserId);
+                    Ingredient winner = ingredientRepository.findById(merge.winnerId).orElse(null);
+                    if (winner != null && !winner.getName().equals(merge.canonicalName)) {
+                        winner.setName(merge.canonicalName);
+                        ingredientRepository.save(winner);
+                    }
                 }
             }
         }
@@ -99,7 +108,8 @@ public class IngredientNormalizationService {
         return a.getId().compareTo(b.getId()) <= 0 ? a : b;
     }
 
-    private void repointReferences(String orgId, String loserId, String winnerId, String canonicalName) {
+    private void repointReferences(String orgId, String loserId, String winnerId,
+                                     String canonicalName, List<InventoryItem> allInventory) {
         Query recipeQuery = new Query(Criteria.where("orgId").is(orgId)
                 .and("ingredients.ingredientId").is(loserId));
         Update recipeUpdate = new Update()
@@ -116,7 +126,7 @@ public class IngredientNormalizationService {
                 .filterArray(Criteria.where("elem.ingredientId").is(loserId));
         mongoTemplate.updateMulti(pinnedQuery, pinnedUpdate, "pinned_recipes");
 
-        List<InventoryItem> loserItems = inventoryItemRepository.findByOrgId(orgId).stream()
+        List<InventoryItem> loserItems = allInventory.stream()
                 .filter(item -> loserId.equals(item.getIngredientId()))
                 .toList();
 

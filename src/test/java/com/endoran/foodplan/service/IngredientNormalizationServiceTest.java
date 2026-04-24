@@ -71,7 +71,12 @@ class IngredientNormalizationServiceTest {
         Ingredient reviewed = makeIngredient("1", "Garlic Powder", false);
         Ingredient unreviewed = makeIngredient("2", "garlic powder", true);
         when(ingredientRepository.findByOrgId("org1")).thenReturn(List.of(reviewed, unreviewed));
-        when(ingredientRepository.findById("1")).thenReturn(Optional.of(reviewed));
+        when(ingredientRepository.findById(anyString())).thenAnswer(inv -> {
+            String id = inv.getArgument(0);
+            if ("1".equals(id)) return Optional.of(reviewed);
+            if ("2".equals(id)) return Optional.of(unreviewed);
+            return Optional.empty();
+        });
         when(inventoryItemRepository.findByOrgId("org1")).thenReturn(List.of());
 
         var result = service.normalizeAll("org1", false);
@@ -103,6 +108,96 @@ class IngredientNormalizationServiceTest {
 
         assertEquals(0, result.renames().size());
         assertEquals(0, result.merges().size());
+    }
+
+    @Test
+    void threeWayMergeAllLosersPointToSingleWinner() {
+        Ingredient a = makeIngredient("1", "garlic powder", true);
+        Ingredient b = makeIngredient("2", "Garlic Powder", false);
+        Ingredient c = makeIngredient("3", "GARLIC POWDER", true);
+        when(ingredientRepository.findByOrgId("org1")).thenReturn(List.of(a, b, c));
+        when(ingredientRepository.findById(anyString())).thenAnswer(inv -> {
+            String id = inv.getArgument(0);
+            if ("1".equals(id)) return Optional.of(a);
+            if ("2".equals(id)) return Optional.of(b);
+            if ("3".equals(id)) return Optional.of(c);
+            return Optional.empty();
+        });
+        when(inventoryItemRepository.findByOrgId("org1")).thenReturn(List.of());
+
+        var result = service.normalizeAll("org1", false);
+
+        assertEquals(2, result.merges().size());
+        for (var merge : result.merges()) {
+            assertEquals("2", merge.winnerId());
+        }
+        var loserIds = result.merges().stream().map(m -> m.loserId()).sorted().toList();
+        assertEquals(List.of("1", "3"), loserIds);
+        verify(ingredientRepository).deleteById("1");
+        verify(ingredientRepository).deleteById("3");
+    }
+
+    @Test
+    void inventoryMergesSameUnitSumsQuantities() {
+        Ingredient reviewed = makeIngredient("1", "Garlic Powder", false);
+        Ingredient unreviewed = makeIngredient("2", "garlic powder", true);
+        when(ingredientRepository.findByOrgId("org1")).thenReturn(List.of(reviewed, unreviewed));
+        when(ingredientRepository.findById(anyString())).thenAnswer(inv -> {
+            String id = inv.getArgument(0);
+            if ("1".equals(id)) return Optional.of(reviewed);
+            if ("2".equals(id)) return Optional.of(unreviewed);
+            return Optional.empty();
+        });
+
+        InventoryItem winnerItem = new InventoryItem();
+        winnerItem.setId("inv1");
+        winnerItem.setOrgId("org1");
+        winnerItem.setIngredientId("1");
+        winnerItem.setUnit(MeasurementUnit.TSP);
+        winnerItem.setQuantity(new BigDecimal("2.5"));
+
+        InventoryItem loserItem = new InventoryItem();
+        loserItem.setId("inv2");
+        loserItem.setOrgId("org1");
+        loserItem.setIngredientId("2");
+        loserItem.setUnit(MeasurementUnit.TSP);
+        loserItem.setQuantity(new BigDecimal("1.5"));
+
+        when(inventoryItemRepository.findByOrgId("org1")).thenReturn(List.of(winnerItem, loserItem));
+        when(inventoryItemRepository.findByOrgIdAndIngredientIdAndUnit("org1", "1", MeasurementUnit.TSP))
+                .thenReturn(Optional.of(winnerItem));
+
+        service.normalizeAll("org1", false);
+
+        assertEquals(new BigDecimal("4.0"), winnerItem.getQuantity());
+        verify(inventoryItemRepository).save(winnerItem);
+        verify(inventoryItemRepository).deleteById("inv2");
+    }
+
+    @Test
+    void mergeRepointsRecipeAndPinnedRecipeReferences() {
+        Ingredient reviewed = makeIngredient("1", "Garlic Powder", false);
+        Ingredient unreviewed = makeIngredient("2", "garlic powder", true);
+        when(ingredientRepository.findByOrgId("org1")).thenReturn(List.of(reviewed, unreviewed));
+        when(ingredientRepository.findById(anyString())).thenAnswer(inv -> {
+            String id = inv.getArgument(0);
+            if ("1".equals(id)) return Optional.of(reviewed);
+            if ("2".equals(id)) return Optional.of(unreviewed);
+            return Optional.empty();
+        });
+        when(inventoryItemRepository.findByOrgId("org1")).thenReturn(List.of());
+
+        service.normalizeAll("org1", false);
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> updateCaptor = ArgumentCaptor.forClass(Update.class);
+        ArgumentCaptor<String> collectionCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mongoTemplate, times(2)).updateMulti(
+                queryCaptor.capture(), updateCaptor.capture(), collectionCaptor.capture());
+
+        var collections = collectionCaptor.getAllValues();
+        assertTrue(collections.contains("recipes"));
+        assertTrue(collections.contains("pinned_recipes"));
     }
 
     private Ingredient makeIngredient(String id, String name, boolean needsReview) {

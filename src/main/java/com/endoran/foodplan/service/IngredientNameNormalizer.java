@@ -56,7 +56,19 @@ public final class IngredientNameNormalizer {
     }
 
     private static String titleCase(String word) {
-        if (word.length() == 1) return word.toUpperCase();
-        return Character.toUpperCase(word.charAt(0)) + word.substring(1).toLowerCase();
+        if (!word.contains("-")) {
+            if (word.length() == 1) return word.toUpperCase();
+            return Character.toUpperCase(word.charAt(0)) + word.substring(1).toLowerCase();
+        }
+        String[] parts = word.split("-", -1);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) sb.append('-');
+            String p = parts[i];
+            if (p.isEmpty()) continue;
+            sb.append(Character.toUpperCase(p.charAt(0)));
+            if (p.length() > 1) sb.append(p.substring(1).toLowerCase());
+        }
+        return sb.toString();
     }
 }

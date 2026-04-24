@@ -61,7 +61,7 @@ class IngredientNameNormalizerTest {
 
     @Test
     void hyphenatedWordsPreserved() {
-        assertEquals("All-purpose Flour", IngredientNameNormalizer.normalize("all-purpose flour"));
+        assertEquals("All-Purpose Flour", IngredientNameNormalizer.normalize("all-purpose flour"));
     }
 
     @Test

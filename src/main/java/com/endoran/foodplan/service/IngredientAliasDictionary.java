@@ -20,8 +20,10 @@ public final class IngredientAliasDictionary {
         alias(m, "Whole Milk", "milk", "whole milk");
         alias(m, "Cheddar Cheese", "cheddar", "sharp cheddar", "mild cheddar");
         alias(m, "Mozzarella Cheese", "mozzarella", "fresh mozzarella", "shredded mozzarella");
-        alias(m, "Monterey Jack Cheese", "monterey jack", "pepper jack", "pepper jack cheese");
-        alias(m, "Swiss Cheese", "swiss", "gruyere", "gruyère");
+        alias(m, "Monterey Jack Cheese", "monterey jack");
+        alias(m, "Pepper Jack Cheese", "pepper jack");
+        alias(m, "Swiss Cheese", "swiss");
+        alias(m, "Gruyere Cheese", "gruyere", "gruyère");
         alias(m, "Ricotta Cheese", "ricotta");
         alias(m, "Cottage Cheese", "cottage cheese");
         alias(m, "Plain Yogurt", "yogurt", "plain greek yogurt", "greek yogurt");
