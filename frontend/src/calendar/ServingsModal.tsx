@@ -12,19 +12,23 @@ const MEAL_TYPES: MealType[] = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'];
 export function ServingsModal({ recipeName, onConfirm, onCancel }: ServingsModalProps) {
   const [servingsText, setServingsText] = useState('2');
   const [mealType, setMealType] = useState<MealType>('DINNER');
+  const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const n = parseInt(servingsText);
-    if (!isNaN(n) && n >= 1) {
-      onConfirm(n, mealType);
+    if (isNaN(n) || n < 1) {
+      setError('Servings must be at least 1');
+      return;
     }
+    onConfirm(n, mealType);
   };
 
   return (
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <h3>Add "{recipeName}"</h3>
+        {error && <div className="error">{error}</div>}
         <form onSubmit={handleSubmit} className="modal-form">
           <label>
             Meal
