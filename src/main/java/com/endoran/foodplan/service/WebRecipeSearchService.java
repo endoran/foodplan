@@ -27,13 +27,6 @@ public class WebRecipeSearchService {
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
-    private static final List<String> RECIPE_SITES = List.of(
-            "allrecipes.com", "food.com", "foodnetwork.com",
-            "simplyrecipes.com", "budgetbytes.com", "seriouseats.com",
-            "epicurious.com", "bonappetit.com", "delish.com",
-            "tasty.co", "cookieandkate.com", "minimalistbaker.com"
-    );
-
     // DuckDuckGo HTML result patterns
     private static final Pattern RESULT_PATTERN = Pattern.compile(
             "<a[^>]+class=\"result__a\"[^>]+href=\"([^\"]+)\"[^>]*>(.+?)</a>",
@@ -43,8 +36,11 @@ public class WebRecipeSearchService {
             Pattern.DOTALL);
     private static final Pattern HTML_TAG = Pattern.compile("<[^>]+>");
 
-    public List<WebRecipeSearchResult> search(String query) {
-        String siteFilter = RECIPE_SITES.stream()
+    public List<WebRecipeSearchResult> search(String query, List<String> allowedSites) {
+        if (allowedSites == null || allowedSites.isEmpty()) {
+            return List.of();
+        }
+        String siteFilter = allowedSites.stream()
                 .map(s -> "site:" + s)
                 .reduce((a, b) -> a + " OR " + b)
                 .orElse("");

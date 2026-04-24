@@ -6,6 +6,7 @@ import com.endoran.foodplan.dto.RecipeResponse;
 import com.endoran.foodplan.dto.SharedRecipeResponse;
 import com.endoran.foodplan.dto.WebRecipeSearchResult;
 import com.endoran.foodplan.service.GlobalRecipeService;
+import com.endoran.foodplan.service.OrgSettingsService;
 import com.endoran.foodplan.service.RecipeNotFoundException;
 import com.endoran.foodplan.service.WebRecipeSearchService;
 import org.springframework.http.HttpStatus;
@@ -23,11 +24,14 @@ public class GlobalRecipeController {
 
     private final GlobalRecipeService globalRecipeService;
     private final WebRecipeSearchService webRecipeSearchService;
+    private final OrgSettingsService orgSettingsService;
 
     public GlobalRecipeController(GlobalRecipeService globalRecipeService,
-                                  WebRecipeSearchService webRecipeSearchService) {
+                                  WebRecipeSearchService webRecipeSearchService,
+                                  OrgSettingsService orgSettingsService) {
         this.globalRecipeService = globalRecipeService;
         this.webRecipeSearchService = webRecipeSearchService;
+        this.orgSettingsService = orgSettingsService;
     }
 
     @GetMapping("/status")
@@ -73,12 +77,15 @@ public class GlobalRecipeController {
 
     @GetMapping("/web-search")
     public ResponseEntity<List<WebRecipeSearchResult>> webSearch(
+            @AuthenticationPrincipal Jwt jwt,
             @RequestParam("q") String query) {
         checkEnabled();
         if (query == null || query.isBlank() || query.length() < 2) {
             return ResponseEntity.ok(List.of());
         }
-        return ResponseEntity.ok(webRecipeSearchService.search(query));
+        String orgId = jwt.getClaimAsString("orgId");
+        List<String> sites = orgSettingsService.getAllowedRecipeSites(orgId);
+        return ResponseEntity.ok(webRecipeSearchService.search(query, sites));
     }
 
     @GetMapping("/{sharedId}")

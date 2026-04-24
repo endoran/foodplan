@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiGet, apiPost, apiPut } from '../api/client';
 import type { Recipe, Ingredient } from './types';
@@ -13,6 +13,106 @@ interface IngredientRow {
 
 const UNITS = ['TSP', 'TBSP', 'CUP', 'PINT', 'QUART', 'GALLON', 'HALF_GALLON', 'WHOLE', 'LBS', 'OZ', 'PINCH', 'PIECE'];
 
+function IngredientAutocomplete({ value, onSelect }: {
+  value: string;
+  onSelect: (id: string, name: string) => void;
+}) {
+  const [query, setQuery] = useState(value);
+  const [suggestions, setSuggestions] = useState<Ingredient[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [highlightIndex, setHighlightIndex] = useState(-1);
+  const [loading, setLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => { setQuery(value); }, [value]);
+
+  useEffect(() => {
+    return () => { if (debounceRef.current !== null) clearTimeout(debounceRef.current); };
+  }, []);
+
+  const search = async (term: string) => {
+    if (!term || term.length < 1) {
+      setSuggestions([]);
+      setShowDropdown(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await apiGet<Ingredient[]>(`/api/v1/ingredients?name=${encodeURIComponent(term)}`);
+      setSuggestions(data);
+      setShowDropdown(data.length > 0);
+      setHighlightIndex(-1);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (val: string) => {
+    setQuery(val);
+    if (debounceRef.current !== null) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => search(val), 300);
+  };
+
+  const selectItem = (ing: Ingredient) => {
+    setQuery(ing.name);
+    setShowDropdown(false);
+    onSelect(ing.id, ing.name);
+  };
+
+  const handleBlur = () => {
+    setTimeout(() => {
+      setShowDropdown(false);
+      if (query !== value) {
+        onSelect('', query);
+      }
+    }, 150);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showDropdown) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightIndex(prev => Math.min(prev + 1, suggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightIndex(prev => Math.max(prev - 1, 0));
+    } else if (e.key === 'Enter' && highlightIndex >= 0) {
+      e.preventDefault();
+      selectItem(suggestions[highlightIndex]);
+    } else if (e.key === 'Escape') {
+      setShowDropdown(false);
+    }
+  };
+
+  return (
+    <div className="autocomplete-wrap">
+      <input
+        type="text"
+        value={query}
+        onChange={e => handleChange(e.target.value)}
+        onFocus={() => { if (suggestions.length > 0) setShowDropdown(true); }}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+        placeholder="Type ingredient name..."
+      />
+      {showDropdown && (
+        <div className="autocomplete-dropdown">
+          {loading && <div className="autocomplete-loading">Searching...</div>}
+          {suggestions.map((ing, i) => (
+            <div
+              key={ing.id}
+              className={`autocomplete-option${i === highlightIndex ? ' highlighted' : ''}`}
+              onMouseDown={e => { e.preventDefault(); selectItem(ing); }}
+            >
+              {ing.name}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function RecipeFormPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -22,19 +122,12 @@ export function RecipeFormPage() {
   const [instructions, setInstructions] = useState('');
   const [baseServings, setBaseServings] = useState(1);
   const [ingredients, setIngredients] = useState<IngredientRow[]>([]);
-  const [availableIngredients, setAvailableIngredients] = useState<Ingredient[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadIngredients();
     if (isEdit) loadRecipe();
   }, [id]);
-
-  const loadIngredients = async () => {
-    const data = await apiGet<Ingredient[]>('/api/v1/ingredients');
-    setAvailableIngredients(data);
-  };
 
   const loadRecipe = async () => {
     const recipe = await apiGet<Recipe>(`/api/v1/recipes/${id}`);
@@ -61,10 +154,6 @@ export function RecipeFormPage() {
   const updateRow = (index: number, field: keyof IngredientRow, value: string) => {
     const updated = [...ingredients];
     updated[index] = { ...updated[index], [field]: value };
-    if (field === 'ingredientId') {
-      const found = availableIngredients.find(i => i.id === value);
-      updated[index].ingredientName = found?.name || '';
-    }
     setIngredients(updated);
   };
 
@@ -103,7 +192,6 @@ export function RecipeFormPage() {
     }
   };
 
-  // Group ingredients by section for display
   const groups: { section: string; startIndex: number }[] = [];
   ingredients.forEach((ing, i) => {
     if (i === 0 || ing.section !== ingredients[i - 1].section) {
@@ -159,21 +247,16 @@ export function RecipeFormPage() {
                 )}
                 {groupRows.map((row, j) => {
                   const i = group.startIndex + j;
-                  // Try to match ingredientId from available list by name
-                  const matchedId = row.ingredientId || availableIngredients.find(
-                    a => a.name.toLowerCase() === row.ingredientName.toLowerCase()
-                  )?.id || '';
                   return (
                     <div key={i} className="ingredient-row">
-                      <select
-                        value={matchedId}
-                        onChange={e => updateRow(i, 'ingredientId', e.target.value)}
-                      >
-                        <option value="">{row.ingredientName || 'Select ingredient...'}</option>
-                        {availableIngredients.map(ing => (
-                          <option key={ing.id} value={ing.id}>{ing.name}</option>
-                        ))}
-                      </select>
+                      <IngredientAutocomplete
+                        value={row.ingredientName}
+                        onSelect={(selId, selName) => {
+                          const updated = [...ingredients];
+                          updated[i] = { ...updated[i], ingredientId: selId, ingredientName: selName };
+                          setIngredients(updated);
+                        }}
+                      />
                       <input
                         type="number"
                         placeholder="Qty"
