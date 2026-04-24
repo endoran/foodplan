@@ -41,7 +41,7 @@ export function RecipeImportPage() {
 
   const [name, setName] = useState('');
   const [instructions, setInstructions] = useState('');
-  const [baseServings, setBaseServings] = useState(1);
+  const [baseServingsText, setBaseServingsText] = useState('1');
   const [ingredients, setIngredients] = useState<ImportedIngredient[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -59,7 +59,7 @@ export function RecipeImportPage() {
       setPreview(data);
       setName(data.name);
       setInstructions(data.instructions);
-      setBaseServings(data.baseServings);
+      setBaseServingsText(String(data.baseServings));
       setIngredients(data.ingredients);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
@@ -101,6 +101,12 @@ export function RecipeImportPage() {
   };
 
   const saveRecipe = async () => {
+    const baseServings = parseInt(baseServingsText);
+    if (isNaN(baseServings) || baseServings < 1) {
+      setError('Base servings must be at least 1');
+      return;
+    }
+
     const body = {
       name,
       instructions: instructions || null,
@@ -179,8 +185,8 @@ export function RecipeImportPage() {
             Base Servings
             <input
               type="number"
-              value={baseServings}
-              onChange={e => setBaseServings(parseInt(e.target.value) || 1)}
+              value={baseServingsText}
+              onChange={e => setBaseServingsText(e.target.value)}
               min={1}
             />
           </label>

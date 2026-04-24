@@ -120,7 +120,7 @@ export function RecipeFormPage() {
 
   const [name, setName] = useState('');
   const [instructions, setInstructions] = useState('');
-  const [baseServings, setBaseServings] = useState(1);
+  const [baseServingsText, setBaseServingsText] = useState('1');
   const [ingredients, setIngredients] = useState<IngredientRow[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -133,7 +133,7 @@ export function RecipeFormPage() {
     const recipe = await apiGet<Recipe>(`/api/v1/recipes/${id}`);
     setName(recipe.name);
     setInstructions(recipe.instructions || '');
-    setBaseServings(recipe.baseServings);
+    setBaseServingsText(String(recipe.baseServings));
     setIngredients(recipe.ingredients.map(ing => ({
       section: ing.section || '',
       ingredientId: ing.ingredientId,
@@ -161,6 +161,13 @@ export function RecipeFormPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
+
+    const baseServings = parseInt(baseServingsText);
+    if (isNaN(baseServings) || baseServings < 1) {
+      setError('Base servings must be at least 1');
+      setLoading(false);
+      return;
+    }
 
     const body = {
       name,
@@ -217,7 +224,7 @@ export function RecipeFormPage() {
 
         <label>
           Base Servings
-          <input type="number" value={baseServings} onChange={e => setBaseServings(parseInt(e.target.value) || 1)} min={1} />
+          <input type="number" value={baseServingsText} onChange={e => setBaseServingsText(e.target.value)} min={1} />
         </label>
 
         <div className="section">
