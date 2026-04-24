@@ -10,6 +10,7 @@ import com.endoran.foodplan.dto.UpdateIngredientRequest;
 import com.endoran.foodplan.model.DietaryTag;
 import com.endoran.foodplan.model.GroceryCategory;
 import com.endoran.foodplan.service.IngredientNotFoundException;
+import com.endoran.foodplan.service.IngredientNormalizationService;
 import com.endoran.foodplan.service.IngredientService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -35,9 +36,12 @@ import java.util.Map;
 public class IngredientController {
 
     private final IngredientService ingredientService;
+    private final IngredientNormalizationService normalizationService;
 
-    public IngredientController(IngredientService ingredientService) {
+    public IngredientController(IngredientService ingredientService,
+                                IngredientNormalizationService normalizationService) {
         this.ingredientService = ingredientService;
+        this.normalizationService = normalizationService;
     }
 
     @PostMapping
@@ -97,6 +101,14 @@ public class IngredientController {
             @AuthenticationPrincipal Jwt jwt) {
         String orgId = jwt.getClaimAsString("orgId");
         return ResponseEntity.ok(ingredientService.autoCategorize(orgId));
+    }
+
+    @PostMapping("/normalize")
+    public ResponseEntity<IngredientNormalizationService.NormalizationResult> normalize(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "true") boolean dryRun) {
+        String orgId = jwt.getClaimAsString("orgId");
+        return ResponseEntity.ok(normalizationService.normalizeAll(orgId, dryRun));
     }
 
     @PutMapping("/{id}")

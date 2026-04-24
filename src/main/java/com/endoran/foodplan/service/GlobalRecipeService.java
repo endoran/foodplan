@@ -319,6 +319,7 @@ public class GlobalRecipeService {
                                        Map<String, SharedRecipeIngredient> sourceMetadata) {
         for (var ri : ingredients) {
             if (ri.getIngredientId() != null && !ri.getIngredientId().isBlank()) continue;
+            ri.setIngredientName(IngredientAliasDictionary.resolveAndNormalize(ri.getIngredientName()));
             var existing = ingredientRepository.findByOrgIdAndNameIgnoreCase(orgId, ri.getIngredientName());
             if (existing.isPresent()) {
                 ri.setIngredientId(existing.get().getId());

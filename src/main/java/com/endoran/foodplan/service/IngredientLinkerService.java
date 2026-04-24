@@ -29,6 +29,7 @@ public class IngredientLinkerService {
         for (SharedRecipeIngredient sri : ingredients) {
             if (sri.getIngredientId() != null && !sri.getIngredientId().isBlank()) continue;
 
+            sri.setIngredientName(IngredientAliasDictionary.resolveAndNormalize(sri.getIngredientName()));
             var existing = ingredientRepository.findByOrgIdAndNameIgnoreCase(orgId, sri.getIngredientName());
             if (existing.isPresent()) {
                 sri.setIngredientId(existing.get().getId());
