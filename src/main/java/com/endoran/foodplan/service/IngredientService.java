@@ -13,6 +13,7 @@ import com.endoran.foodplan.repository.IngredientRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -54,6 +55,7 @@ public class IngredientService {
         } else {
             ingredients = ingredientRepository.findByOrgId(orgId);
         }
+        ingredients.sort(Comparator.comparing(Ingredient::getName, String.CASE_INSENSITIVE_ORDER));
         return ingredients.stream().map(this::toResponse).toList();
     }
 
@@ -136,6 +138,7 @@ public class IngredientService {
                 })
                 .toList();
         ingredientRepository.saveAll(updated);
+        ingredients.sort(Comparator.comparing(Ingredient::getName, String.CASE_INSENSITIVE_ORDER));
         return ingredients.stream().map(this::toResponse).toList();
     }
 
