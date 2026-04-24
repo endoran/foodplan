@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiPost } from '../api/client';
+import { parseFraction } from '../utils/parseFraction';
 import { formatEnum } from '../utils/formatEnum';
 
 interface ImportedIngredient {
   name: string;
-  quantity: number;
+  quantity: number | string;
   unit: string;
   rawText: string;
   prepNote?: string;
@@ -107,16 +108,23 @@ export function RecipeImportPage() {
       return;
     }
 
+    const parsed = ingredients.map(ing => ({
+      ingredientId: '',
+      ingredientName: ing.name,
+      quantity: typeof ing.quantity === 'string' ? parseFraction(ing.quantity) : ing.quantity,
+      unit: ing.unit,
+    }));
+
+    if (parsed.some(ing => isNaN(ing.quantity) || ing.quantity <= 0)) {
+      setError('Invalid quantity — use a number or fraction (e.g. 1/2)');
+      return;
+    }
+
     const body = {
       name,
       instructions: instructions || null,
       baseServings,
-      ingredients: ingredients.map(ing => ({
-        ingredientId: '',
-        ingredientName: ing.name,
-        quantity: ing.quantity,
-        unit: ing.unit,
-      })),
+      ingredients: parsed,
     };
     const created = await apiPost<{ id: string }>('/api/v1/recipes', body);
     navigate(`/recipes/${created.id}`);
@@ -218,11 +226,10 @@ export function RecipeImportPage() {
                     )}
                   </div>
                   <input
-                    type="number"
+                    type="text"
                     value={ing.quantity}
-                    onChange={e => updateIngredient(i, 'quantity', parseFloat(e.target.value) || 0)}
-                    step="0.01"
-                    min="0"
+                    onChange={e => updateIngredient(i, 'quantity', e.target.value)}
+                    placeholder="e.g. 1/2"
                     style={{ flex: 1 }}
                   />
                   <select

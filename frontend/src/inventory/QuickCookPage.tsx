@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { parseFraction } from '../utils/parseFraction';
 import { apiGet, apiPost } from '../api/client';
 import type { Ingredient } from '../recipes/types';
 
@@ -45,9 +46,14 @@ export function QuickCookPage() {
       .filter(r => r.ingredientId && r.quantity)
       .map(r => ({
         ingredientId: r.ingredientId,
-        quantity: parseFloat(r.quantity),
+        quantity: parseFraction(r.quantity),
         unit: r.unit,
       }));
+
+    if (items.some(item => isNaN(item.quantity) || item.quantity <= 0)) {
+      setError('Invalid quantity — use a number or fraction (e.g. 1/2)');
+      return;
+    }
 
     if (items.length === 0) {
       setError('Add at least one ingredient');
@@ -97,12 +103,10 @@ export function QuickCookPage() {
                 ))}
               </select>
               <input
-                type="number"
-                placeholder="Qty"
+                type="text"
+                placeholder="Qty (e.g. 1/2)"
                 value={row.quantity}
                 onChange={e => updateRow(i, 'quantity', e.target.value)}
-                step="0.01"
-                min="0.01"
                 required
               />
               <select value={row.unit} onChange={e => updateRow(i, 'unit', e.target.value)}>

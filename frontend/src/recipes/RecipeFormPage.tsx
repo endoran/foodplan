@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiGet, apiPost, apiPut } from '../api/client';
 import type { Recipe, Ingredient } from './types';
+import { parseFraction } from '../utils/parseFraction';
 
 interface IngredientRow {
   section: string;
@@ -169,19 +170,27 @@ export function RecipeFormPage() {
       return;
     }
 
+    const parsed = ingredients
+      .filter(row => (row.ingredientId || row.ingredientName) && row.quantity)
+      .map(row => ({
+        section: row.section || null,
+        ingredientId: row.ingredientId,
+        ingredientName: row.ingredientName,
+        quantity: parseFraction(row.quantity),
+        unit: row.unit,
+      }));
+
+    if (parsed.some(ing => isNaN(ing.quantity) || ing.quantity <= 0)) {
+      setError('Invalid quantity — use a number or fraction (e.g. 1/2)');
+      setLoading(false);
+      return;
+    }
+
     const body = {
       name,
       instructions: instructions || null,
       baseServings,
-      ingredients: ingredients
-        .filter(row => (row.ingredientId || row.ingredientName) && row.quantity)
-        .map(row => ({
-          section: row.section || null,
-          ingredientId: row.ingredientId,
-          ingredientName: row.ingredientName,
-          quantity: parseFloat(row.quantity),
-          unit: row.unit,
-        })),
+      ingredients: parsed,
     };
 
     try {
@@ -265,12 +274,10 @@ export function RecipeFormPage() {
                         }}
                       />
                       <input
-                        type="number"
-                        placeholder="Qty"
+                        type="text"
+                        placeholder="Qty (e.g. 1/2)"
                         value={row.quantity}
                         onChange={e => updateRow(i, 'quantity', e.target.value)}
-                        step="0.01"
-                        min="0.01"
                         required
                       />
                       <select value={row.unit} onChange={e => updateRow(i, 'unit', e.target.value)}>
