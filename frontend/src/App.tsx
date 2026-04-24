@@ -18,6 +18,7 @@ import { CalendarPage } from './calendar/CalendarPage';
 import { InventoryPage } from './inventory/InventoryPage';
 import { ShoppingListPage } from './inventory/ShoppingListPage';
 import { QuickCookPage } from './inventory/QuickCookPage';
+import { SettingsPage } from './settings/SettingsPage';
 
 export function App() {
   return (
@@ -43,6 +44,7 @@ export function App() {
             <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
             <Route path="/shopping-list" element={<ProtectedRoute><ShoppingListPage /></ProtectedRoute>} />
             <Route path="/quick-cook" element={<ProtectedRoute><QuickCookPage /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="/" element={<Navigate to="/recipes" replace />} />
           </Route>
         </Routes>

@@ -21,6 +21,7 @@ export function NavBar() {
           <Link to="/inventory">Pantry</Link>
           <Link to="/quick-cook">Quick Cook</Link>
           <Link to="/shopping-list">Shopping List</Link>
+          <Link to="/settings">Settings</Link>
           <span className="nav-user">{user?.email}</span>
           <button onClick={handleLogout} className="btn btn-small">Logout</button>
         </div>
