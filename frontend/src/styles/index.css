@@ -435,3 +435,11 @@ body {
   color: var(--text);
   cursor: pointer;
 }
+
+/* App Footer */
+.app-footer {
+  text-align: center;
+  padding: 1rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}

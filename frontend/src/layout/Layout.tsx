@@ -8,6 +8,9 @@ export function Layout() {
       <main className="content">
         <Outlet />
       </main>
+      <footer className="app-footer">
+        v{__APP_VERSION__} · {new Date(__BUILD_TIME__).toLocaleDateString()}
+      </footer>
     </div>
   );
 }
