@@ -253,6 +253,7 @@ public class RecipeService {
             boolean changed = false;
             for (RecipeIngredient ri : recipe.getIngredients()) {
                 if (ri.getIngredientId() != null && !ri.getIngredientId().isBlank()) continue;
+                ri.setIngredientName(IngredientAliasDictionary.resolveAndNormalize(ri.getIngredientName()));
                 var existing = ingredientRepository.findByOrgIdAndNameIgnoreCase(orgId, ri.getIngredientName());
                 if (existing.isPresent()) {
                     ri.setIngredientId(existing.get().getId());
@@ -284,6 +285,7 @@ public class RecipeService {
         for (RecipeIngredient ri : ingredients) {
             if (ri.getIngredientId() != null && !ri.getIngredientId().isBlank()) continue;
 
+            ri.setIngredientName(IngredientAliasDictionary.resolveAndNormalize(ri.getIngredientName()));
             var existing = ingredientRepository.findByOrgIdAndNameIgnoreCase(
                     orgId, ri.getIngredientName());
             if (existing.isPresent()) {

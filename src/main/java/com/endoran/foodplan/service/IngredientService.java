@@ -28,7 +28,7 @@ public class IngredientService {
     public IngredientResponse create(String orgId, CreateIngredientRequest request) {
         Ingredient ingredient = new Ingredient();
         ingredient.setOrgId(orgId);
-        ingredient.setName(request.name());
+        ingredient.setName(IngredientAliasDictionary.resolveAndNormalize(request.name()));
         ingredient.setStorageCategory(request.storageCategory());
         ingredient.setGroceryCategory(request.groceryCategory());
         if (request.dietaryTags() != null) {
@@ -78,32 +78,33 @@ public class IngredientService {
 
     public List<IngredientPreparation> prepareIngredients(String orgId, List<String> ingredientNames) {
         return ingredientNames.stream().map(name -> {
-            var existing = ingredientRepository.findByOrgIdAndNameIgnoreCase(orgId, name);
+            String normalized = IngredientAliasDictionary.resolveAndNormalize(name);
+            var existing = ingredientRepository.findByOrgIdAndNameIgnoreCase(orgId, normalized);
             if (existing.isPresent()) {
                 Ingredient ing = existing.get();
                 return new IngredientPreparation(
-                        name, IngredientPreparation.Status.EXISTING,
+                        normalized, IngredientPreparation.Status.EXISTING,
                         ing.getStorageCategory(), ing.getGroceryCategory(),
                         ing.isShoppingListExclude());
             }
             IngredientCategoryInference.InferredCategories inferred =
-                    IngredientCategoryInference.infer(name);
+                    IngredientCategoryInference.infer(normalized);
             return new IngredientPreparation(
-                    name, IngredientPreparation.Status.NEW,
+                    normalized, IngredientPreparation.Status.NEW,
                     inferred.storage(), inferred.grocery(), false);
         }).toList();
     }
 
     public List<IngredientResponse> batchCreate(String orgId, BatchCreateIngredientsRequest request) {
         return request.ingredients().stream().map(entry -> {
-            // Skip if already exists (race condition guard)
-            var existing = ingredientRepository.findByOrgIdAndNameIgnoreCase(orgId, entry.name());
+            String normalizedName = IngredientAliasDictionary.resolveAndNormalize(entry.name());
+            var existing = ingredientRepository.findByOrgIdAndNameIgnoreCase(orgId, normalizedName);
             if (existing.isPresent()) {
                 return toResponse(existing.get());
             }
             Ingredient ingredient = new Ingredient();
             ingredient.setOrgId(orgId);
-            ingredient.setName(entry.name());
+            ingredient.setName(normalizedName);
             ingredient.setStorageCategory(entry.storageCategory());
             ingredient.setGroceryCategory(entry.groceryCategory());
             ingredient.setShoppingListExclude(entry.shoppingListExclude());
