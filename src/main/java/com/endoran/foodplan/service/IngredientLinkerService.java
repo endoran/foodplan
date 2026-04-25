@@ -70,6 +70,8 @@ public class IngredientLinkerService {
                         }
                     }
                     newIng.setDietaryTags(tags);
+                } else {
+                    newIng.setDietaryTags(IngredientCategoryInference.infer(sri.getIngredientName()).dietaryTags());
                 }
 
                 newIng.setNeedsReview(false);

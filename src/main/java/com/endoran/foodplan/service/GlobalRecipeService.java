@@ -362,6 +362,8 @@ public class GlobalRecipeService {
                         }
                     }
                     newIng.setDietaryTags(tags);
+                } else {
+                    newIng.setDietaryTags(IngredientCategoryInference.infer(ri.getIngredientName()).dietaryTags());
                 }
 
                 newIng.setNeedsReview(false);
