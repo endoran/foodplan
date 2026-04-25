@@ -12,7 +12,9 @@ public final class IngredientAliasDictionary {
 
         // --- Dairy ---
         alias(m, "Parmesan Cheese", "parmigiano-reggiano", "parmigiano reggiano", "parmesan",
-                "parm cheese", "grated parmesan", "shredded parmesan");
+                "parm cheese", "grated parmesan", "shredded parmesan",
+                "parmesan cheese (powder-style)", "powder-style parmesan",
+                "cheese (from the green can)");
         alias(m, "Heavy Cream", "heavy whipping cream", "whipping cream");
         alias(m, "Cream Cheese", "cream cheese spread", "neufchatel");
         alias(m, "Sour Cream", "soured cream");
@@ -37,7 +39,7 @@ public final class IngredientAliasDictionary {
                 "skinless chicken breast", "chicken breasts");
         alias(m, "Chicken Thighs", "boneless skinless chicken thighs", "boneless chicken thighs",
                 "chicken thigh");
-        alias(m, "Whole Chicken", "roasting chicken", "whole fryer");
+        alias(m, "Whole Chicken", "roasting chicken", "whole fryer", "whole young chicken");
         alias(m, "Bacon", "bacon strips", "sliced bacon", "thick cut bacon");
         alias(m, "Italian Sausage", "italian sausage links", "sweet italian sausage",
                 "hot italian sausage", "mild italian sausage");
@@ -47,6 +49,8 @@ public final class IngredientAliasDictionary {
         alias(m, "Salmon Fillet", "salmon", "salmon filet", "fresh salmon");
         alias(m, "Shrimp", "prawns", "raw shrimp", "large shrimp", "jumbo shrimp");
         alias(m, "Tofu", "firm tofu", "extra firm tofu");
+        alias(m, "Cooked Chicken Breast", "cooked chicken breast (diced)",
+                "diced cooked chicken breast", "cooked chicken (diced)");
 
         // --- Produce ---
         alias(m, "Green Onion", "scallion", "scallions", "spring onion", "spring onions",
@@ -63,6 +67,8 @@ public final class IngredientAliasDictionary {
                 "jalapenos", "jalapeños");
         alias(m, "Fresh Ginger", "ginger", "ginger root", "gingerroot");
         alias(m, "Lemon", "lemons", "fresh lemon");
+        alias(m, "Lemon Juice", "fresh lemon juice", "bottled lemon juice");
+        alias(m, "Lime Juice", "fresh lime juice", "bottled lime juice");
         alias(m, "Lime", "limes", "fresh lime");
         alias(m, "Roma Tomato", "roma tomatoes", "plum tomato", "plum tomatoes");
         alias(m, "Cherry Tomatoes", "grape tomatoes", "cherry tomato");
@@ -182,6 +188,10 @@ public final class IngredientAliasDictionary {
         alias(m, "Frozen Spinach", "frozen chopped spinach", "spinach (frozen)");
         alias(m, "Frozen Mixed Vegetables", "frozen mixed veggies", "frozen vegetables");
         alias(m, "Frozen Berries", "frozen mixed berries");
+
+        // --- Household ---
+        alias(m, "Water", "cold water", "warm water", "hot water", "ice water",
+                "lukewarm water", "room temperature water");
 
         ALIASES = Map.copyOf(m);
     }

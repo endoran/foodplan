@@ -266,7 +266,8 @@ public class RecipeService {
                     newIng.setName(ri.getIngredientName());
                     newIng.setStorageCategory(inferred.storage());
                     newIng.setGroceryCategory(inferred.grocery());
-                    newIng.setNeedsReview(true);
+                    newIng.setDietaryTags(inferred.dietaryTags());
+                    newIng.setNeedsReview(IngredientKnowledgeBase.lookup(ri.getIngredientName()).isEmpty());
                     newIng = ingredientRepository.save(newIng);
                     ri.setIngredientId(newIng.getId());
                     ingredientsCreated++;
@@ -298,7 +299,8 @@ public class RecipeService {
                 newIng.setName(ri.getIngredientName());
                 newIng.setStorageCategory(inferred.storage());
                 newIng.setGroceryCategory(inferred.grocery());
-                newIng.setNeedsReview(true);
+                newIng.setDietaryTags(inferred.dietaryTags());
+                newIng.setNeedsReview(IngredientKnowledgeBase.lookup(ri.getIngredientName()).isEmpty());
                 newIng = ingredientRepository.save(newIng);
                 ri.setIngredientId(newIng.getId());
             }

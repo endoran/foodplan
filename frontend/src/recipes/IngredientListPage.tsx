@@ -7,6 +7,7 @@ import type { Ingredient } from './types';
 interface NormalizationResult {
   renames: { ingredientId: string; oldName: string; newName: string }[];
   merges: { winnerId: string; winnerName: string; loserId: string; loserName: string; canonicalName: string }[];
+  categoryFixes: { ingredientId: string; ingredientName: string; oldStorage: string; newStorage: string; oldGrocery: string; newGrocery: string; oldTags: string[]; newTags: string[] }[];
   skipped: number;
 }
 
@@ -103,7 +104,7 @@ export function IngredientListPage() {
       {normalizePreview && (
         <div className="normalize-preview">
           <h3>Normalization Preview</h3>
-          {normalizePreview.renames.length === 0 && normalizePreview.merges.length === 0 ? (
+          {normalizePreview.renames.length === 0 && normalizePreview.merges.length === 0 && normalizePreview.categoryFixes.length === 0 ? (
             <p className="muted">All ingredient names are already normalized.</p>
           ) : (
             <>
@@ -124,6 +125,18 @@ export function IngredientListPage() {
                     {normalizePreview.merges.map(m => (
                       <li key={m.loserId}>
                         "{m.loserName}" will merge into "{m.winnerName}" &rarr; {m.canonicalName}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {normalizePreview.categoryFixes.length > 0 && (
+                <div>
+                  <h4>Category Fixes ({normalizePreview.categoryFixes.length})</h4>
+                  <ul>
+                    {normalizePreview.categoryFixes.map(f => (
+                      <li key={f.ingredientId}>
+                        {f.ingredientName}: {formatEnum(f.oldGrocery)} &rarr; {formatEnum(f.newGrocery)}, {formatEnum(f.oldStorage)} &rarr; {formatEnum(f.newStorage)}
                       </li>
                     ))}
                   </ul>

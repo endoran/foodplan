@@ -1,7 +1,10 @@
 package com.endoran.foodplan.service;
 
+import com.endoran.foodplan.model.DietaryTag;
+import com.endoran.foodplan.model.GroceryCategory;
 import com.endoran.foodplan.model.Ingredient;
 import com.endoran.foodplan.model.InventoryItem;
+import com.endoran.foodplan.model.StorageCategory;
 import com.endoran.foodplan.repository.IngredientRepository;
 import com.endoran.foodplan.repository.InventoryItemRepository;
 import org.slf4j.Logger;
@@ -15,8 +18,10 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class IngredientNormalizationService {
@@ -39,6 +44,7 @@ public class IngredientNormalizationService {
         List<Ingredient> ingredients = ingredientRepository.findByOrgId(orgId);
         List<Rename> renames = new ArrayList<>();
         List<Merge> merges = new ArrayList<>();
+        List<CategoryFix> categoryFixes = new ArrayList<>();
         int skipped = 0;
 
         Map<String, List<Ingredient>> groups = new HashMap<>();
@@ -72,6 +78,41 @@ public class IngredientNormalizationService {
             }
         }
 
+        // Category fix pass: re-enrich needsReview ingredients using KB
+        Set<String> mergedLoserIds = new HashSet<>();
+        for (Merge merge : merges) {
+            mergedLoserIds.add(merge.loserId);
+        }
+
+        for (Ingredient ing : ingredients) {
+            if (mergedLoserIds.contains(ing.getId())) continue;
+            if (!ing.isNeedsReview()) continue;
+
+            String lookupName = renames.stream()
+                    .filter(r -> r.ingredientId.equals(ing.getId()))
+                    .map(Rename::newName)
+                    .findFirst()
+                    .orElse(ing.getName());
+
+            var profile = IngredientKnowledgeBase.lookup(lookupName);
+            if (profile.isEmpty()) continue;
+
+            var p = profile.get();
+            boolean categoryChanged = ing.getStorageCategory() != p.storage()
+                    || ing.getGroceryCategory() != p.grocery();
+            boolean tagsChanged = !p.dietaryTags().equals(ing.getDietaryTags() != null
+                    ? ing.getDietaryTags() : Set.of());
+
+            if (categoryChanged || tagsChanged) {
+                categoryFixes.add(new CategoryFix(
+                        ing.getId(), lookupName,
+                        ing.getStorageCategory(), p.storage(),
+                        ing.getGroceryCategory(), p.grocery(),
+                        ing.getDietaryTags() != null ? ing.getDietaryTags() : Set.of(),
+                        p.dietaryTags()));
+            }
+        }
+
         if (!dryRun) {
             for (Rename rename : renames) {
                 Ingredient ing = ingredientRepository.findById(rename.ingredientId).orElse(null);
@@ -94,12 +135,23 @@ public class IngredientNormalizationService {
                     }
                 }
             }
+
+            for (CategoryFix fix : categoryFixes) {
+                Ingredient ing = ingredientRepository.findById(fix.ingredientId).orElse(null);
+                if (ing != null) {
+                    ing.setStorageCategory(fix.newStorage);
+                    ing.setGroceryCategory(fix.newGrocery);
+                    ing.setDietaryTags(fix.newTags);
+                    ing.setNeedsReview(false);
+                    ingredientRepository.save(ing);
+                }
+            }
         }
 
-        log.info("Normalization for org {}: {} renames, {} merges, {} skipped (dryRun={})",
-                orgId, renames.size(), merges.size(), skipped, dryRun);
+        log.info("Normalization for org {}: {} renames, {} merges, {} category fixes, {} skipped (dryRun={})",
+                orgId, renames.size(), merges.size(), categoryFixes.size(), skipped, dryRun);
 
-        return new NormalizationResult(renames, merges, skipped);
+        return new NormalizationResult(renames, merges, categoryFixes, skipped);
     }
 
     private Ingredient pickWinner(Ingredient a, Ingredient b) {
@@ -150,6 +202,7 @@ public class IngredientNormalizationService {
     public record NormalizationResult(
             List<Rename> renames,
             List<Merge> merges,
+            List<CategoryFix> categoryFixes,
             int skipped
     ) {}
 
@@ -157,4 +210,12 @@ public class IngredientNormalizationService {
 
     public record Merge(String winnerId, String winnerName, String loserId,
                          String loserName, String canonicalName) {}
+
+    public record CategoryFix(
+            String ingredientId,
+            String ingredientName,
+            StorageCategory oldStorage, StorageCategory newStorage,
+            GroceryCategory oldGrocery, GroceryCategory newGrocery,
+            Set<DietaryTag> oldTags, Set<DietaryTag> newTags
+    ) {}
 }

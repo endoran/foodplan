@@ -85,13 +85,14 @@ public class IngredientService {
                 return new IngredientPreparation(
                         normalized, IngredientPreparation.Status.EXISTING,
                         ing.getStorageCategory(), ing.getGroceryCategory(),
-                        ing.isShoppingListExclude());
+                        ing.getDietaryTags(), ing.isShoppingListExclude());
             }
             IngredientCategoryInference.InferredCategories inferred =
                     IngredientCategoryInference.infer(normalized);
             return new IngredientPreparation(
                     normalized, IngredientPreparation.Status.NEW,
-                    inferred.storage(), inferred.grocery(), false);
+                    inferred.storage(), inferred.grocery(),
+                    inferred.dietaryTags(), false);
         }).toList();
     }
 
@@ -136,6 +137,8 @@ public class IngredientService {
                             IngredientCategoryInference.infer(ing.getName());
                     ing.setStorageCategory(inferred.storage());
                     ing.setGroceryCategory(inferred.grocery());
+                    ing.setDietaryTags(inferred.dietaryTags());
+                    ing.setNeedsReview(IngredientKnowledgeBase.lookup(ing.getName()).isEmpty());
                 })
                 .toList();
         ingredientRepository.saveAll(updated);
