@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { apiGet } from '../api/client';
-import { getGlobalBookStatus, getMyPins, unpinRecipe, acceptPinUpdate, copyPinnedAsOwn } from '../api/globalRecipes';
+import { getGlobalBookStatus, getMyPins, unpinRecipe, acceptPinUpdate, copyPinnedAsOwn, searchWebRecipes } from '../api/globalRecipes';
 import type { Recipe } from './types';
-import type { GlobalBookStatus, PinnedRecipe } from './global-types';
+import type { GlobalBookStatus, PinnedRecipe, WebRecipeResult } from './global-types';
 
 export function RecipeListPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -14,6 +14,8 @@ export function RecipeListPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmUnpin, setConfirmUnpin] = useState<string | null>(null);
   const [calendarWarning, setCalendarWarning] = useState<{ pinnedId: string; count: number } | null>(null);
+  const [webResults, setWebResults] = useState<WebRecipeResult[]>([]);
+  const [webLoading, setWebLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -50,6 +52,16 @@ export function RecipeListPage() {
     if (debounceRef.current !== null) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       loadRecipes(value || undefined);
+      if (value.trim().length >= 2) {
+        setWebLoading(true);
+        searchWebRecipes(value.trim())
+          .then(results => setWebResults(results))
+          .catch(() => setWebResults([]))
+          .finally(() => setWebLoading(false));
+      } else {
+        setWebResults([]);
+        setWebLoading(false);
+      }
     }, 300);
   };
 
@@ -105,6 +117,16 @@ export function RecipeListPage() {
     ? pins.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
     : pins;
 
+  const groupedWebResults = useMemo(() => {
+    const grouped = new Map<string, WebRecipeResult[]>();
+    webResults.forEach(r => {
+      const existing = grouped.get(r.site) || [];
+      existing.push(r);
+      grouped.set(r.site, existing);
+    });
+    return grouped;
+  }, [webResults]);
+
   return (
     <div className="page">
       <div className="page-header">
@@ -122,7 +144,7 @@ export function RecipeListPage() {
       <div className="search-bar">
         <input
           type="text"
-          placeholder="Search recipes..."
+          placeholder="Search recipes and the web..."
           value={search}
           onChange={e => handleSearchChange(e.target.value)}
         />
@@ -243,6 +265,52 @@ export function RecipeListPage() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {(webLoading || webResults.length > 0) && (
+        <div style={{ marginTop: '2rem' }}>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ fontSize: '1.1rem', color: 'var(--muted)', margin: 0 }}>Online Recipes</h2>
+            <Link to="/recipes/import" className="btn btn-small">Import URL</Link>
+          </div>
+          {webLoading ? (
+            <p style={{ marginTop: '0.75rem' }}>Searching the web...</p>
+          ) : (
+            Array.from(groupedWebResults.entries()).map(([site, results]) => (
+              <div key={site} style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '0.95rem', color: 'var(--text)', marginBottom: '0.5rem', marginTop: '1rem' }}>
+                  {site}
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {results.map((result, i) => (
+                    <a
+                      key={i}
+                      href={result.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'block',
+                        padding: '0.75rem',
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius)',
+                        textDecoration: 'none',
+                        color: 'var(--text)',
+                      }}
+                    >
+                      <div style={{ fontWeight: 500, color: 'var(--primary)' }}>{result.title}</div>
+                      {result.snippet && (
+                        <div style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '0.25rem' }}>
+                          {result.snippet}
+                        </div>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>
