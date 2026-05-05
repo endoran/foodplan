@@ -1,11 +1,13 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiGet } from '../api/client';
 import { getGlobalBookStatus, getMyPins, unpinRecipe, acceptPinUpdate, copyPinnedAsOwn, searchWebRecipes } from '../api/globalRecipes';
+import { WebRecipePanel } from './WebRecipePanel';
 import type { Recipe } from './types';
 import type { GlobalBookStatus, PinnedRecipe, WebRecipeResult } from './global-types';
 
 export function RecipeListPage() {
+  const navigate = useNavigate();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -16,7 +18,9 @@ export function RecipeListPage() {
   const [calendarWarning, setCalendarWarning] = useState<{ pinnedId: string; count: number } | null>(null);
   const [webResults, setWebResults] = useState<WebRecipeResult[]>([]);
   const [webLoading, setWebLoading] = useState(false);
+  const [panel, setPanel] = useState<{ result: WebRecipeResult; mode: 'quicklook' | 'preview' } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const webRequestRef = useRef(0);
 
   useEffect(() => {
     loadRecipes();
@@ -53,12 +57,20 @@ export function RecipeListPage() {
     debounceRef.current = setTimeout(() => {
       loadRecipes(value || undefined);
       if (value.trim().length >= 2) {
+        const requestId = ++webRequestRef.current;
         setWebLoading(true);
         searchWebRecipes(value.trim())
-          .then(results => setWebResults(results))
-          .catch(() => setWebResults([]))
-          .finally(() => setWebLoading(false));
+          .then(results => {
+            if (webRequestRef.current === requestId) setWebResults(results);
+          })
+          .catch(() => {
+            if (webRequestRef.current === requestId) setWebResults([]);
+          })
+          .finally(() => {
+            if (webRequestRef.current === requestId) setWebLoading(false);
+          });
       } else {
+        webRequestRef.current++;
         setWebResults([]);
         setWebLoading(false);
       }
@@ -116,16 +128,6 @@ export function RecipeListPage() {
   const filteredPins = search
     ? pins.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
     : pins;
-
-  const groupedWebResults = useMemo(() => {
-    const grouped = new Map<string, WebRecipeResult[]>();
-    webResults.forEach(r => {
-      const existing = grouped.get(r.site) || [];
-      existing.push(r);
-      grouped.set(r.site, existing);
-    });
-    return grouped;
-  }, [webResults]);
 
   return (
     <div className="page">
@@ -277,41 +279,52 @@ export function RecipeListPage() {
           {webLoading ? (
             <p style={{ marginTop: '0.75rem' }}>Searching the web...</p>
           ) : (
-            Array.from(groupedWebResults.entries()).map(([site, results]) => (
-              <div key={site} style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ fontSize: '0.95rem', color: 'var(--text)', marginBottom: '0.5rem', marginTop: '1rem' }}>
-                  {site}
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {results.map((result, i) => (
-                    <a
-                      key={i}
-                      href={result.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: 'block',
-                        padding: '0.75rem',
-                        background: 'var(--surface)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 'var(--radius)',
-                        textDecoration: 'none',
-                        color: 'var(--text)',
-                      }}
-                    >
-                      <div style={{ fontWeight: 500, color: 'var(--primary)' }}>{result.title}</div>
-                      {result.snippet && (
-                        <div style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '0.25rem' }}>
-                          {result.snippet}
-                        </div>
-                      )}
-                    </a>
-                  ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem' }}>
+              {webResults.map((result, i) => (
+                <div key={i} className="web-recipe-card">
+                  <img
+                    className="favicon"
+                    src={`https://www.google.com/s2/favicons?domain=${result.site}&sz=32`}
+                    alt=""
+                  />
+                  <div className="card-body">
+                    <div className="card-title">{result.title}</div>
+                    <div className="card-site">{result.site}</div>
+                    {result.snippet && <div className="card-snippet">{result.snippet}</div>}
+                    <div className="card-actions">
+                      <button
+                        className="btn btn-small"
+                        onClick={() => setPanel({ result, mode: 'quicklook' })}
+                      >
+                        Quick Look
+                      </button>
+                      <button
+                        className="btn btn-small"
+                        onClick={() => setPanel({ result, mode: 'preview' })}
+                      >
+                        Preview
+                      </button>
+                      <button
+                        className="btn btn-small btn-primary"
+                        onClick={() => navigate(`/recipes/import?url=${encodeURIComponent(result.url)}`)}
+                      >
+                        Import
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
+      )}
+
+      {panel && (
+        <WebRecipePanel
+          result={panel.result}
+          mode={panel.mode}
+          onClose={() => setPanel(null)}
+        />
       )}
     </div>
   );

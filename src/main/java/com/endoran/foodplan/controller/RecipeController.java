@@ -109,6 +109,12 @@ public class RecipeController {
         }
     }
 
+    @GetMapping("/preview-meta")
+    public ResponseEntity<Map<String, String>> previewMeta(@RequestParam String url) {
+        String imageUrl = recipeImportService.extractOgImage(url);
+        return ResponseEntity.ok(Map.of("image", imageUrl != null ? imageUrl : ""));
+    }
+
     @PostMapping(value = "/scan", consumes = "multipart/form-data")
     public ResponseEntity<ScanResult> scanFile(
             @AuthenticationPrincipal Jwt jwt,

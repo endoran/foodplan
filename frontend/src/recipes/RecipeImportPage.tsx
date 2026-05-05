@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiPost } from '../api/client';
 import { parseFraction } from '../utils/parseFraction';
 import { formatEnum } from '../utils/formatEnum';
@@ -35,6 +35,7 @@ const GROCERY_CATEGORIES = ['PRODUCE', 'MEAT', 'DAIRY', 'BAKING', 'SPICES', 'ETH
 
 export function RecipeImportPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -49,14 +50,21 @@ export function RecipeImportPage() {
   const [step, setStep] = useState<'edit' | 'review'>('edit');
   const [newIngredients, setNewIngredients] = useState<IngredientPreparation[]>([]);
 
-  const handleImport = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    const urlParam = searchParams.get('url');
+    if (urlParam && !preview && !loading) {
+      setUrl(urlParam);
+      doImport(urlParam);
+    }
+  }, []);
+
+  const doImport = async (importUrl: string) => {
     setError('');
     setLoading(true);
     setPreview(null);
     setStep('edit');
     try {
-      const data = await apiPost<ImportedPreview>('/api/v1/recipes/import', { url });
+      const data = await apiPost<ImportedPreview>('/api/v1/recipes/import', { url: importUrl });
       setPreview(data);
       setName(data.name);
       setInstructions(data.instructions);
@@ -67,6 +75,11 @@ export function RecipeImportPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    doImport(url);
   };
 
   const updateIngredient = (index: number, field: keyof ImportedIngredient, value: string | number) => {
