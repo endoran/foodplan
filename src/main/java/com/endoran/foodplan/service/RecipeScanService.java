@@ -283,8 +283,12 @@ public class RecipeScanService {
                 throw new RecipeImportException("Could not read image file — supported formats: JPG, PNG, TIFF, BMP");
             }
 
-            // Apply EXIF orientation — iPhone photos are stored rotated with an EXIF
-            // tag that viewers apply automatically, but ImageIO.read() ignores it.
+            // Downscale BEFORE rotation to avoid OOM on large iPhone photos (5712x4284)
+            int maxDim = Math.max(image.getWidth(), image.getHeight());
+            if (maxDim > 3000) {
+                image = downscaleForVision(image, 3000);
+            }
+
             image = applyExifOrientation(file, image);
 
             return ocrBufferedImage(image);
