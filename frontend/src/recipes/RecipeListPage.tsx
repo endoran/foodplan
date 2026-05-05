@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiGet } from '../api/client';
-import { getGlobalBookStatus, getMyPins, unpinRecipe, acceptPinUpdate, copyPinnedAsOwn } from '../api/globalRecipes';
+import { getGlobalBookStatus, getMyPins, unpinRecipe, acceptPinUpdate, copyPinnedAsOwn, searchWebRecipes } from '../api/globalRecipes';
+import { WebRecipePanel } from './WebRecipePanel';
 import type { Recipe } from './types';
-import type { GlobalBookStatus, PinnedRecipe } from './global-types';
+import type { GlobalBookStatus, PinnedRecipe, WebRecipeResult } from './global-types';
 
 export function RecipeListPage() {
+  const navigate = useNavigate();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -14,7 +16,11 @@ export function RecipeListPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmUnpin, setConfirmUnpin] = useState<string | null>(null);
   const [calendarWarning, setCalendarWarning] = useState<{ pinnedId: string; count: number } | null>(null);
+  const [webResults, setWebResults] = useState<WebRecipeResult[]>([]);
+  const [webLoading, setWebLoading] = useState(false);
+  const [panel, setPanel] = useState<{ result: WebRecipeResult; mode: 'quicklook' | 'preview' } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const webRequestRef = useRef(0);
 
   useEffect(() => {
     loadRecipes();
@@ -50,6 +56,24 @@ export function RecipeListPage() {
     if (debounceRef.current !== null) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       loadRecipes(value || undefined);
+      if (value.trim().length >= 2) {
+        const requestId = ++webRequestRef.current;
+        setWebLoading(true);
+        searchWebRecipes(value.trim())
+          .then(results => {
+            if (webRequestRef.current === requestId) setWebResults(results);
+          })
+          .catch(() => {
+            if (webRequestRef.current === requestId) setWebResults([]);
+          })
+          .finally(() => {
+            if (webRequestRef.current === requestId) setWebLoading(false);
+          });
+      } else {
+        webRequestRef.current++;
+        setWebResults([]);
+        setWebLoading(false);
+      }
     }, 300);
   };
 
@@ -122,7 +146,7 @@ export function RecipeListPage() {
       <div className="search-bar">
         <input
           type="text"
-          placeholder="Search recipes..."
+          placeholder="Search recipes and the web..."
           value={search}
           onChange={e => handleSearchChange(e.target.value)}
         />
@@ -244,6 +268,63 @@ export function RecipeListPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {(webLoading || webResults.length > 0) && (
+        <div style={{ marginTop: '2rem' }}>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ fontSize: '1.1rem', color: 'var(--muted)', margin: 0 }}>Online Recipes</h2>
+            <Link to="/recipes/import" className="btn btn-small">Import URL</Link>
+          </div>
+          {webLoading ? (
+            <p style={{ marginTop: '0.75rem' }}>Searching the web...</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem' }}>
+              {webResults.map((result, i) => (
+                <div key={i} className="web-recipe-card">
+                  <img
+                    className="favicon"
+                    src={`https://www.google.com/s2/favicons?domain=${result.site}&sz=32`}
+                    alt=""
+                  />
+                  <div className="card-body">
+                    <div className="card-title">{result.title}</div>
+                    <div className="card-site">{result.site}</div>
+                    {result.snippet && <div className="card-snippet">{result.snippet}</div>}
+                    <div className="card-actions">
+                      <button
+                        className="btn btn-small"
+                        onClick={() => setPanel({ result, mode: 'quicklook' })}
+                      >
+                        Quick Look
+                      </button>
+                      <button
+                        className="btn btn-small"
+                        onClick={() => setPanel({ result, mode: 'preview' })}
+                      >
+                        Preview
+                      </button>
+                      <button
+                        className="btn btn-small btn-primary"
+                        onClick={() => navigate(`/recipes/import?url=${encodeURIComponent(result.url)}`)}
+                      >
+                        Import
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {panel && (
+        <WebRecipePanel
+          result={panel.result}
+          mode={panel.mode}
+          onClose={() => setPanel(null)}
+        />
       )}
     </div>
   );

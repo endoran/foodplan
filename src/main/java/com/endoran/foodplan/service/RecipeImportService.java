@@ -164,6 +164,29 @@ public class RecipeImportService {
         throw new RecipeImportException("No structured recipe data (JSON-LD) found at this URL");
     }
 
+    public String extractOgImage(String url) {
+        try {
+            Document doc = Jsoup.connect(url)
+                    .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    .timeout(8_000)
+                    .get();
+            Element ogImage = doc.selectFirst("meta[property=og:image]");
+            if (ogImage != null) {
+                String content = ogImage.attr("content");
+                if (!content.isBlank()) return content;
+            }
+            Element twitterImage = doc.selectFirst("meta[name=twitter:image]");
+            if (twitterImage != null) {
+                String content = twitterImage.attr("content");
+                if (!content.isBlank()) return content;
+            }
+            return null;
+        } catch (IOException e) {
+            log.debug("Failed to extract og:image from {}: {}", url, e.getMessage());
+            return null;
+        }
+    }
+
     private ImportedRecipePreview parseJsonLd(JsonNode node, String url) {
         // Handle @graph arrays
         if (node.has("@graph")) {

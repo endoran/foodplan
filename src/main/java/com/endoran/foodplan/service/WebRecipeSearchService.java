@@ -51,7 +51,7 @@ public class WebRecipeSearchService {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("User-Agent", "FoodPlan/1.0")
+                    .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                     .timeout(Duration.ofSeconds(8))
                     .GET()
                     .build();
