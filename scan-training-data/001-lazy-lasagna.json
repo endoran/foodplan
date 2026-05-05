@@ -1,0 +1,69 @@
+{
+  "id": "001",
+  "recipeName": "Lazy Spinach Lasagna",
+  "source": "production-gomez-2026-05-04",
+  "mongoId": "69f8f459d4deed60f4f43a02",
+  "extractionTier": "TEXT_LLM",
+  "modelOutput": {
+    "name": "Spinach Lasagna",
+    "baseServings": 6,
+    "ingredients": [
+      {"name": "thawed ground meat", "quantity": "2", "unit": "LBS", "prepNote": "beef and venison work well"},
+      {"name": "no-sugar-added pizza or spaghetti sauce", "quantity": "2", "unit": "PIECE", "prepNote": "12-ounce jars; see Note"},
+      {"name": "dried oregano", "quantity": "1.5", "unit": "TBSP"},
+      {"name": "Mineral Salt", "quantity": "1", "unit": "TSP"},
+      {"name": "onion powder", "quantity": "1", "unit": "TSP"},
+      {"name": "garlic powder", "quantity": "1", "unit": "TSP"},
+      {"name": "cayenne pepper", "quantity": "0.5", "unit": "TSP"},
+      {"name": "Pure Stevia Extract", "quantity": "1", "unit": "PINCH", "prepNote": "optional"},
+      {"name": "frozen chopped spinach", "quantity": "2", "unit": "PIECE", "prepNote": "thawed; or use 8-16 ounces roughly chopped fresh spinach"},
+      {"name": "¥: less fat cream cheese", "quantity": "1", "unit": "PIECE", "prepNote": "8-ounce package"},
+      {"name": "1% cottage cheese", "quantity": "1", "unit": "WHOLE", "prepNote": "14-ounce"},
+      {"name": "large eggs", "quantity": "2", "unit": "WHOLE"},
+      {"name": "part-skim mozzarella cheese", "quantity": "8", "unit": "OZ", "prepNote": "grated"},
+      {"name": "Parmesan cheese", "quantity": "0.5", "unit": "CUP", "prepNote": "finely grated; for sprinkling over top; green can kind is fine"}
+    ]
+  },
+  "correctedOutput": {
+    "name": "Lazy Spinach Lasagna",
+    "baseServings": 6,
+    "ingredients": [
+      {"name": "ground meat", "quantity": "2", "unit": "LBS"},
+      {"name": "no-sugar-added pizza or spaghetti sauce", "quantity": "24", "unit": "OZ"},
+      {"name": "dried oregano", "quantity": "1.5", "unit": "TBSP"},
+      {"name": "Mineral Salt", "quantity": "1", "unit": "TSP"},
+      {"name": "onion powder", "quantity": "1", "unit": "TSP"},
+      {"name": "garlic powder", "quantity": "1", "unit": "TSP"},
+      {"name": "cayenne pepper", "quantity": "0.125", "unit": "TSP"},
+      {"name": "Pure Stevia Extract", "quantity": "1", "unit": "PINCH"},
+      {"name": "frozen chopped spinach", "quantity": "20", "unit": "OZ"},
+      {"name": "1/3 less fat cream cheese", "quantity": "8", "unit": "OZ"},
+      {"name": "1% cottage cheese", "quantity": "14", "unit": "OZ"},
+      {"name": "large eggs", "quantity": "2", "unit": "WHOLE"},
+      {"name": "part-skim mozzarella cheese", "quantity": "8", "unit": "OZ"},
+      {"name": "Parmesan cheese", "quantity": "0.25", "unit": "CUP"}
+    ]
+  },
+  "corrections": [
+    {"field": "name", "model": "Spinach Lasagna", "correct": "Lazy Spinach Lasagna", "pattern": "TITLE_VERBATIM"},
+    {"field": "ingredients[0].name", "model": "thawed ground meat", "correct": "ground meat", "pattern": "PREP_IN_NAME"},
+    {"field": "ingredients[1].quantity", "model": "2", "correct": "24", "pattern": "PARENTHETICAL_WEIGHT"},
+    {"field": "ingredients[1].unit", "model": "PIECE", "correct": "OZ", "pattern": "PARENTHETICAL_WEIGHT"},
+    {"field": "ingredients[6].quantity", "model": "0.5", "correct": "0.125", "pattern": "SMALL_FRACTION"},
+    {"field": "ingredients[8].quantity", "model": "2", "correct": "20", "pattern": "PARENTHETICAL_WEIGHT"},
+    {"field": "ingredients[8].unit", "model": "PIECE", "correct": "OZ", "pattern": "PARENTHETICAL_WEIGHT"},
+    {"field": "ingredients[9].name", "model": "¥: less fat cream cheese", "correct": "1/3 less fat cream cheese", "pattern": "OCR_GIBBERISH"},
+    {"field": "ingredients[9].quantity", "model": "1", "correct": "8", "pattern": "PARENTHETICAL_WEIGHT"},
+    {"field": "ingredients[9].unit", "model": "PIECE", "correct": "OZ", "pattern": "PARENTHETICAL_WEIGHT"},
+    {"field": "ingredients[10].quantity", "model": "1", "correct": "14", "pattern": "PARENTHETICAL_WEIGHT"},
+    {"field": "ingredients[10].unit", "model": "WHOLE", "correct": "OZ", "pattern": "PARENTHETICAL_WEIGHT"},
+    {"field": "ingredients[13].quantity", "model": "0.5", "correct": "0.25", "pattern": "SMALL_FRACTION"}
+  ],
+  "patternSummary": {
+    "PARENTHETICAL_WEIGHT": 8,
+    "SMALL_FRACTION": 2,
+    "TITLE_VERBATIM": 1,
+    "PREP_IN_NAME": 1,
+    "OCR_GIBBERISH": 1
+  }
+}

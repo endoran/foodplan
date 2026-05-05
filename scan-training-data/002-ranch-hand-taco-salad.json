@@ -1,0 +1,79 @@
+{
+  "id": "002",
+  "recipeName": "Ranch Hand Taco Salad",
+  "source": "production-gomez-2026-05-04",
+  "mongoId": "69f8fc26d4deed60f4f43a12",
+  "extractionTier": "TEXT_LLM",
+  "modelOutput": {
+    "name": "Ranch Hand Taco Salad",
+    "baseServings": 4,
+    "ingredients": [
+      {"name": "ground turkey, venison, or beef", "quantity": "2", "unit": "LBS", "prepNote": "thawed if frozen"},
+      {"name": "chili powder", "quantity": "2", "unit": "TSP"},
+      {"name": "ground cumin", "quantity": "2", "unit": "TSP"},
+      {"name": "paprika (smoked or regular)", "quantity": "2", "unit": "TSP"},
+      {"name": "garlic powder", "quantity": "1", "unit": "TSP"},
+      {"name": "onion powder", "quantity": "1", "unit": "TSP"},
+      {"name": "Mineral Salt", "quantity": "1", "unit": "TSP"},
+      {"name": "water", "quantity": "0.5", "unit": "CUP"},
+      {"name": "romaine lettuce", "quantity": "3", "unit": "WHOLE", "prepNote": "chopped"},
+      {"name": "cherry tomatoes", "quantity": "1", "unit": "PINT", "prepNote": "halved"},
+      {"name": "pinto beans", "quantity": "3", "unit": "CUP", "prepNote": "rinsed and drained, or home-cooked beans"},
+      {"name": "black beans", "quantity": "1.5", "unit": "CUP", "prepNote": "rinsed and drained, or home-cooked beans"},
+      {"name": "corn kernels", "quantity": "1.5", "unit": "CUP", "prepNote": "rinsed and drained"},
+      {"section": "FOR THE EASY RANCH DRESSING", "name": "plain 0% Greek yogurt", "quantity": "2", "unit": "CUP"},
+      {"section": "FOR THE EASY RANCH DRESSING", "name": "garlic powder", "quantity": "1", "unit": "TSP"},
+      {"section": "FOR THE EASY RANCH DRESSING", "name": "onion powder", "quantity": "1", "unit": "TSP"},
+      {"section": "FOR THE EASY RANCH DRESSING", "name": "Mineral Salt", "quantity": "2", "unit": "TSP"},
+      {"section": "FOR THE EASY RANCH DRESSING", "name": "black pepper", "quantity": "1", "unit": "TSP"},
+      {"section": "FOR THE EASY RANCH DRESSING", "name": "dried parsley flakes", "quantity": "2", "unit": "TSP"}
+    ]
+  },
+  "correctedOutput": {
+    "name": "Ranch Hand Taco Salad",
+    "baseServings": 6,
+    "ingredients": [
+      {"name": "ground turkey, venison, or beef", "quantity": "2", "unit": "LBS"},
+      {"name": "chili powder", "quantity": "1.5", "unit": "TBSP"},
+      {"name": "ground cumin", "quantity": "2", "unit": "TSP"},
+      {"name": "paprika (smoked or regular)", "quantity": "2", "unit": "TSP"},
+      {"name": "garlic powder", "quantity": "1", "unit": "TSP"},
+      {"name": "onion powder", "quantity": "1", "unit": "TSP"},
+      {"name": "Mineral Salt", "quantity": "1", "unit": "TSP"},
+      {"name": "water", "quantity": "0.75", "unit": "CUP"},
+      {"name": "romaine lettuce", "quantity": "3", "unit": "WHOLE"},
+      {"name": "cherry tomatoes", "quantity": "1", "unit": "PINT"},
+      {"name": "pinto beans", "quantity": "30", "unit": "OZ"},
+      {"name": "black beans", "quantity": "15", "unit": "OZ"},
+      {"name": "corn kernels", "quantity": "15", "unit": "OZ"},
+      {"section": "FOR THE EASY RANCH DRESSING", "name": "plain 0% Greek yogurt", "quantity": "0.5", "unit": "CUP"},
+      {"section": "FOR THE EASY RANCH DRESSING", "name": "garlic powder", "quantity": "1", "unit": "TSP"},
+      {"section": "FOR THE EASY RANCH DRESSING", "name": "onion powder", "quantity": "1", "unit": "TSP"},
+      {"section": "FOR THE EASY RANCH DRESSING", "name": "Mineral Salt", "quantity": "0.5", "unit": "TSP"},
+      {"section": "FOR THE EASY RANCH DRESSING", "name": "black pepper", "quantity": "1", "unit": "TSP"},
+      {"section": "FOR THE EASY RANCH DRESSING", "name": "dried parsley flakes", "quantity": "2", "unit": "TSP"}
+    ]
+  },
+  "corrections": [
+    {"field": "baseServings", "model": 4, "correct": 6, "pattern": "SERVINGS_MISREAD"},
+    {"field": "ingredients[1].quantity", "model": "2", "correct": "1.5", "pattern": "FRACTION_UNIT_COMBO"},
+    {"field": "ingredients[1].unit", "model": "TSP", "correct": "TBSP", "pattern": "FRACTION_UNIT_COMBO"},
+    {"field": "ingredients[7].quantity", "model": "0.5", "correct": "0.75", "pattern": "SMALL_FRACTION"},
+    {"field": "ingredients[10].quantity", "model": "3", "correct": "30", "pattern": "PARENTHETICAL_WEIGHT"},
+    {"field": "ingredients[10].unit", "model": "CUP", "correct": "OZ", "pattern": "PARENTHETICAL_WEIGHT"},
+    {"field": "ingredients[11].quantity", "model": "1.5", "correct": "15", "pattern": "DIGIT_DECIMAL_CONFUSION"},
+    {"field": "ingredients[11].unit", "model": "CUP", "correct": "OZ", "pattern": "PARENTHETICAL_WEIGHT"},
+    {"field": "ingredients[12].quantity", "model": "1.5", "correct": "15", "pattern": "DIGIT_DECIMAL_CONFUSION"},
+    {"field": "ingredients[12].unit", "model": "CUP", "correct": "OZ", "pattern": "PARENTHETICAL_WEIGHT"},
+    {"field": "ingredients[13].quantity", "model": "2", "correct": "0.5", "pattern": "SMALL_FRACTION"},
+    {"field": "ingredients[16].quantity", "model": "2", "correct": "0.5", "pattern": "SMALL_FRACTION"}
+  ],
+  "patternSummary": {
+    "PARENTHETICAL_WEIGHT": 4,
+    "DIGIT_DECIMAL_CONFUSION": 2,
+    "SMALL_FRACTION": 3,
+    "FRACTION_UNIT_COMBO": 1,
+    "SERVINGS_MISREAD": 1
+  },
+  "notes": "Model used TEXT_LLM tier (OCR → qwen3:14b). The '2 (15-ounce) cans pinto beans' was read as '3 CUP' — even worse than digit confusion, it seems to have hallucinated entirely. The ¾ cup water became ½ and 'Rounded ½ cup yogurt' became '2 CUP'. Card says 'FEEDS 6 TO 8' but model extracted 4."
+}

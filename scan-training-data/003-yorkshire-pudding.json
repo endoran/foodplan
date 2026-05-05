@@ -1,0 +1,43 @@
+{
+  "id": "003",
+  "recipeName": "Yorkshire Pudding",
+  "source": "production-gomez-2026-04-24",
+  "mongoId": "69ebff9e55b8522581c86ca2",
+  "extractionTier": "VISION",
+  "modelOutput": {
+    "name": "Yorkshire Pudding",
+    "baseServings": 3,
+    "ingredients": [
+      {"name": "flour", "quantity": "0.75", "unit": "CUP"},
+      {"name": "salt", "quantity": "1.5", "unit": "TSP"},
+      {"name": "eggs", "quantity": "2", "unit": "WHOLE"},
+      {"name": "milk", "quantity": "0.5", "unit": "CUP"},
+      {"name": "water", "quantity": "0.5", "unit": "CUP"},
+      {"name": "butter", "quantity": "0.25", "unit": "CUP", "prepNote": "melted"}
+    ]
+  },
+  "correctedOutput": {
+    "name": "Yorkshire Pudding",
+    "baseServings": 8,
+    "ingredients": [
+      {"name": "flour", "quantity": "0.89", "unit": "CUP"},
+      {"name": "salt", "quantity": "0.5", "unit": "TSP"},
+      {"name": "eggs", "quantity": "2", "unit": "WHOLE"},
+      {"name": "milk", "quantity": "0.5", "unit": "CUP"},
+      {"name": "water", "quantity": "0.5", "unit": "CUP"},
+      {"name": "butter", "quantity": "0.5", "unit": "CUP"}
+    ]
+  },
+  "corrections": [
+    {"field": "baseServings", "model": 3, "correct": 8, "pattern": "SERVINGS_MISREAD"},
+    {"field": "ingredients[0].quantity", "model": "0.75", "correct": "0.89", "pattern": "HANDWRITTEN_QUANTITY"},
+    {"field": "ingredients[1].quantity", "model": "1.5", "correct": "0.5", "pattern": "HANDWRITTEN_QUANTITY"},
+    {"field": "ingredients[5].quantity", "model": "0.25", "correct": "0.5", "pattern": "SMALL_FRACTION"}
+  ],
+  "patternSummary": {
+    "SERVINGS_MISREAD": 1,
+    "HANDWRITTEN_QUANTITY": 2,
+    "SMALL_FRACTION": 1
+  },
+  "notes": "Handwritten recipe (VISION tier). Model struggled with handwritten numbers. Flour '0.89' is unusual — likely user measured precisely from the card. Salt '1.5 TSP' is a big misread from what was '½ tsp'. Butter ¼ → ½ is the recurring small-fraction issue."
+}

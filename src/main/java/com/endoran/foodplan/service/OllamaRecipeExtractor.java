@@ -71,7 +71,14 @@ public class OllamaRecipeExtractor {
             - Use PINCH for "doonks", dashes, or pinches
             - NAME = shopping-list item. Strip ALL prep verbs (peeled, chopped, minced, sliced, diced, grated, beaten, etc.)
             - PREP NOTE = preparation guidance stripped from the name (e.g., "grated", "peeled and left whole", "beaten")
-            - Convert unicode fractions to decimals (1/2=0.5, 1/4=0.25, 3/4=0.75, 1/3=0.333, 2/3=0.667)
+            - Convert unicode fractions to decimals (1/8=0.125, 1/4=0.25, 1/3=0.333, 3/8=0.375, 1/2=0.5, 2/3=0.667, 3/4=0.75, 7/8=0.875). \
+            CRITICAL: ⅛ = 0.125, not 0.5. Read small fractions carefully — do NOT round up to 0.5.
+            - PARENTHETICAL WEIGHT PATTERN: When a recipe says "X (Y-ounce) can/package/container/jar <item>", \
+            the Y is the weight and should be extracted as quantity=Y, unit=OZ. \
+            Examples: "1 (15-ounce) can pinto beans" → quantity=15, unit=OZ. "1 (14-ounce) container cottage cheese" → quantity=14, unit=OZ. \
+            "1 (8-ounce) package cream cheese" → quantity=8, unit=OZ. \
+            For multiple containers: "2 (15-ounce) cans beans" → quantity=30, unit=OZ (multiply count × weight). \
+            NEVER confuse "15" in "(15-ounce)" with the decimal "1.5".
             - For ranges like "3/4-1 cup" or "3 to 4 tablespoons", use the higher value
             - Number each instruction step
             - Do NOT include serving suggestions, family meal ideas, or non-recipe text in instructions
@@ -134,6 +141,11 @@ public class OllamaRecipeExtractor {
             NEVER use WHOLE when a measurement abbreviation is present.
             - If a recipe card has multiple columns for different serving sizes (single/double/triple/quad), \
             extract ONLY the first (smallest) column values
+            - PARENTHETICAL WEIGHT (CRITICAL): "1 (15-ounce) can beans" = quantity 15, unit OZ. \
+            "1 (8-ounce) package cream cheese" = quantity 8, unit OZ. \
+            "2 (10-ounce) packages spinach" = quantity 20, unit OZ. \
+            The number in parentheses IS the measurement — use OZ, not WHOLE.
+            - SMALL FRACTIONS (CRITICAL): ⅛ = 0.125, ¼ = 0.25, ⅓ = 0.333. Read these precisely — do NOT default to 0.5.
             - "Makes X" or "Serves X" indicates baseServings
             """ + RECIPE_SCHEMA + "\n\n" + RULES;
 
