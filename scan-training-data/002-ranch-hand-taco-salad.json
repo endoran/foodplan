@@ -1,0 +1,108 @@
+{
+  "id": "002",
+  "recipeName": "Ranch Hand Taco Salad",
+  "source": "production-gomez-scan-2026-05",
+  "imageFile": "ranch-hand-taco-salad.jpeg",
+  "extractionTier": "VISION",
+  "modelOutput": {
+    "name": "Ranch Hand Taco Salad",
+    "instructions": "1. Brown the meat in a large skillet over medium-high heat. If the meat is not at least 96% lean, once cooked, rinse it very well under hot (better yet, boiling) water to release all the fat. Return the meat to the skillet and add the chili powder, cumin, paprika, garlic powder, onion powder, salt, and water. Simmer for 2 to 3 minutes, then remove from the heat.\n2. Put the chopped lettuce, tomatoes, beans, and corn in a large salad bowl.\n3. Make the ranch dressing. Combine the yogurt, seasonings, and parsley flakes in a small bowl.\n4. Dump the dressing into the large bowl with the salad and mix well to coat. Add the seasoned meat. Toss all the ingredients well. Add the toppings if desired.",
+    "baseServings": 6,
+    "ingredients": [
+      {"section": null, "name": "ground turkey", "quantity": 2, "unit": "LBS", "prepNote": "venison, or beef; thawed if frozen"},
+      {"section": null, "name": "chili powder", "quantity": 1.5, "unit": "TBSP", "prepNote": null},
+      {"section": null, "name": "ground cumin", "quantity": 2, "unit": "TSP", "prepNote": null},
+      {"section": null, "name": "paprika", "quantity": 2, "unit": "TSP", "prepNote": "smoked or regular"},
+      {"section": null, "name": "garlic powder", "quantity": 1, "unit": "TSP", "prepNote": null},
+      {"section": null, "name": "onion powder", "quantity": 1, "unit": "TSP", "prepNote": null},
+      {"section": null, "name": "Mineral Salt", "quantity": 1, "unit": "TSP", "prepNote": null},
+      {"section": null, "name": "water", "quantity": 0.75, "unit": "CUP", "prepNote": null},
+      {"section": null, "name": "romaine lettuce", "quantity": 3, "unit": "WHOLE", "prepNote": "large heads; chopped (use the larger amount if you have big eaters)"},
+      {"section": null, "name": "cherry tomatoes", "quantity": 1, "unit": "PINT", "prepNote": "halved"},
+      {"section": null, "name": "pinto beans", "quantity": 1.5, "unit": "CUP", "prepNote": "rinsed and drained, or home-cooked beans"},
+      {"section": null, "name": "black beans", "quantity": 1.5, "unit": "CUP", "prepNote": "rinsed and drained, or home-cooked beans"},
+      {"section": null, "name": "corn kernels", "quantity": 1.5, "unit": "CUP", "prepNote": "rinsed and drained"},
+      {"section": "Easy Ranch Dressing", "name": "plain 0% Greek yogurt", "quantity": 0.5, "unit": "CUP", "prepNote": null},
+      {"section": "Easy Ranch Dressing", "name": "garlic powder", "quantity": 1, "unit": "TSP", "prepNote": "rounded"},
+      {"section": "Easy Ranch Dressing", "name": "onion powder", "quantity": 1, "unit": "TSP", "prepNote": "rounded"},
+      {"section": "Easy Ranch Dressing", "name": "Mineral Salt", "quantity": 0.5, "unit": "TSP", "prepNote": "rounded"},
+      {"section": "Easy Ranch Dressing", "name": "ground black pepper", "quantity": 1, "unit": "TSP", "prepNote": "rounded"},
+      {"section": "Easy Ranch Dressing", "name": "dried parsley flakes", "quantity": 2, "unit": "TSP", "prepNote": null},
+      {"section": "Optional Toppings", "name": "baked corn chips", "quantity": null, "unit": null, "prepNote": "crumbled"},
+      {"section": "Optional Toppings", "name": "salsa", "quantity": null, "unit": null, "prepNote": null},
+      {"section": "Optional Toppings", "name": "Greek yogurt", "quantity": null, "unit": null, "prepNote": null}
+    ]
+  },
+  "correctedOutput": {
+    "name": "Ranch Hand Taco Salad",
+    "instructions": "1. Brown the meat in a large skillet over medium-high heat. If the meat is not at least 96% lean, once cooked, rinse it very well under hot (better yet, boiling) water to release all the fat. Return the meat to the skillet and add the chili powder, cumin, paprika, garlic powder, onion powder, salt, and water. Simmer for 2 to 3 minutes, then remove from the heat.\n2. Put the chopped lettuce, tomatoes, beans, and corn in a large salad bowl.\n3. Make the ranch dressing. Combine the yogurt, seasonings, and parsley flakes in a small bowl.\n4. Dump the dressing into the large bowl with the salad and mix well to coat. Add the seasoned meat. Toss all the ingredients well. Add the toppings if desired.",
+    "baseServings": 6,
+    "ingredients": [
+      {"section": null, "name": "ground turkey", "quantity": 2, "unit": "LBS", "prepNote": "venison, or beef; thawed if frozen"},
+      {"section": null, "name": "chili powder", "quantity": 1.5, "unit": "TBSP", "prepNote": null},
+      {"section": null, "name": "ground cumin", "quantity": 2, "unit": "TSP", "prepNote": null},
+      {"section": null, "name": "paprika", "quantity": 2, "unit": "TSP", "prepNote": "smoked or regular"},
+      {"section": null, "name": "garlic powder", "quantity": 1, "unit": "TSP", "prepNote": null},
+      {"section": null, "name": "onion powder", "quantity": 1, "unit": "TSP", "prepNote": null},
+      {"section": null, "name": "Mineral Salt", "quantity": 1, "unit": "TSP", "prepNote": null},
+      {"section": null, "name": "water", "quantity": 0.75, "unit": "CUP", "prepNote": null},
+      {"section": null, "name": "romaine lettuce", "quantity": 3, "unit": "WHOLE", "prepNote": "large heads; chopped (use the larger amount if you have big eaters)"},
+      {"section": null, "name": "cherry tomatoes", "quantity": 1, "unit": "PINT", "prepNote": "halved"},
+      {"section": null, "name": "pinto beans", "quantity": 15, "unit": "OZ", "prepNote": "canned; rinsed and drained, or home-cooked beans"},
+      {"section": null, "name": "black beans", "quantity": 15, "unit": "OZ", "prepNote": "canned; rinsed and drained, or home-cooked beans"},
+      {"section": null, "name": "corn kernels", "quantity": 15, "unit": "OZ", "prepNote": "canned; rinsed and drained"},
+      {"section": "Easy Ranch Dressing", "name": "plain 0% Greek yogurt", "quantity": 0.5, "unit": "CUP", "prepNote": null},
+      {"section": "Easy Ranch Dressing", "name": "garlic powder", "quantity": 1, "unit": "TSP", "prepNote": "rounded"},
+      {"section": "Easy Ranch Dressing", "name": "onion powder", "quantity": 1, "unit": "TSP", "prepNote": "rounded"},
+      {"section": "Easy Ranch Dressing", "name": "Mineral Salt", "quantity": 0.5, "unit": "TSP", "prepNote": "rounded"},
+      {"section": "Easy Ranch Dressing", "name": "ground black pepper", "quantity": 1, "unit": "TSP", "prepNote": "rounded"},
+      {"section": "Easy Ranch Dressing", "name": "dried parsley flakes", "quantity": 2, "unit": "TSP", "prepNote": null},
+      {"section": "Optional Toppings", "name": "baked corn chips", "quantity": null, "unit": null, "prepNote": "crumbled"},
+      {"section": "Optional Toppings", "name": "salsa", "quantity": null, "unit": null, "prepNote": null},
+      {"section": "Optional Toppings", "name": "Greek yogurt", "quantity": null, "unit": null, "prepNote": null}
+    ]
+  },
+  "corrections": [
+    {
+      "field": "ingredients[10].quantity",
+      "modelValue": 1.5,
+      "correctValue": 15,
+      "reason": "Pattern: '2 (15-ounce) cans pinto beans' — model misread '15' as '1.5'. The parenthetical is 15 ounces per can × 2 cans = 30oz total, but user corrected to 15 OZ (one can's worth per the recipe card pattern)"
+    },
+    {
+      "field": "ingredients[10].unit",
+      "modelValue": "CUP",
+      "correctValue": "OZ",
+      "reason": "Canned goods with (X-ounce) should use OZ unit, not CUP"
+    },
+    {
+      "field": "ingredients[11].quantity",
+      "modelValue": 1.5,
+      "correctValue": 15,
+      "reason": "Same pattern: '1 (15-ounce) beans' — model confused 15 oz with 1.5"
+    },
+    {
+      "field": "ingredients[11].unit",
+      "modelValue": "CUP",
+      "correctValue": "OZ",
+      "reason": "Canned goods with (X-ounce) should use OZ unit"
+    },
+    {
+      "field": "ingredients[12].quantity",
+      "modelValue": 1.5,
+      "correctValue": 15,
+      "reason": "Same pattern: '1 (15-ounce) can corn kernels' — model confused 15 oz with 1.5"
+    },
+    {
+      "field": "ingredients[12].unit",
+      "modelValue": "CUP",
+      "correctValue": "OZ",
+      "reason": "Canned goods with (X-ounce) should use OZ unit"
+    }
+  ],
+  "patternLessons": [
+    "CANNED_GOODS_OUNCES: When recipe says 'X (Y-ounce) cans <item>', extract each can as quantity=Y, unit=OZ. Never confuse '15' with '1.5' — these are ounces not cups.",
+    "DIGIT_FRACTION_CONFUSION: The number '15' in parenthetical '(15-ounce)' must not be misinterpreted as the decimal 1.5. Similarly '12' is not '1.2', '14' is not '1.4'.",
+    "MULTI_CAN_HANDLING: For '2 (15-ounce) cans', the total is 30 OZ (2×15). For shopping list purposes, capture total weight or per-can with quantity multiplied."
+  ]
+}

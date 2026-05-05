@@ -1,0 +1,92 @@
+{
+  "id": "001",
+  "recipeName": "Lazy Lasagna",
+  "source": "production-gomez-scan-2026-05",
+  "imageFile": "lazy-lasagna.jpeg",
+  "extractionTier": "VISION",
+  "modelOutput": {
+    "name": "Lazy Lasagna",
+    "instructions": "1. Preheat the oven to 350°F.\n2. Brown the meat in a large skillet over high heat, then drain off any excess fat if necessary. Add the sauce and seasonings, and simmer over low heat for several minutes.\n3. If using frozen spinach, put the spinach in a colander and squeeze and push to get all the liquid out.\n4. Put the cream cheese, cottage cheese, and eggs in a food processor and process until smooth.\n5. Layer half the meat sauce in the bottom of a 9 x 13-inch baking dish. Top with half the grated mozzarella, then layer on half the spinach. Follow with half the cheese mixture, then layer on half the spinach. Repeat the layers, ending with the mozzarella. Top with a good sprinkling of Parmesan cheese. Bake for 40 minutes or until bubbly.",
+    "baseServings": 6,
+    "ingredients": [
+      {"name": "ground meat", "quantity": 2, "unit": "LBS", "prepNote": "thawed; beef and venison work well"},
+      {"name": "spaghetti sauce", "quantity": 2, "unit": "WHOLE", "prepNote": "12-ounce jars; no-sugar-added pizza or spaghetti sauce (see Note)"},
+      {"name": "dried oregano", "quantity": 1.5, "unit": "TBSP", "prepNote": null},
+      {"name": "Mineral Salt", "quantity": 0.5, "unit": "TSP", "prepNote": null},
+      {"name": "onion powder", "quantity": 1, "unit": "TSP", "prepNote": null},
+      {"name": "garlic powder", "quantity": 1, "unit": "TSP", "prepNote": null},
+      {"name": "cayenne pepper", "quantity": 0.5, "unit": "TSP", "prepNote": null},
+      {"name": "Pure Stevia Extract", "quantity": 1, "unit": "PINCH", "prepNote": "optional"},
+      {"name": "frozen chopped spinach", "quantity": 20, "unit": "OZ", "prepNote": "thawed; or use 8-16 ounces roughly chopped fresh spinach, depending on how much you prefer"},
+      {"name": "less fat cream cheese", "quantity": 1, "unit": "WHOLE", "prepNote": "8-ounce package; 1/3 less fat"},
+      {"name": "cottage cheese", "quantity": 1, "unit": "WHOLE", "prepNote": "14-ounce container; 1%"},
+      {"name": "large eggs", "quantity": 2, "unit": "WHOLE", "prepNote": null},
+      {"name": "part-skim mozzarella cheese", "quantity": 8, "unit": "OZ", "prepNote": "grated"},
+      {"name": "Parmesan cheese", "quantity": 0.5, "unit": "CUP", "prepNote": "finely grated; for sprinkling over top; green can kind is fine"}
+    ]
+  },
+  "correctedOutput": {
+    "name": "Lazy Lasagna",
+    "instructions": "1. Preheat the oven to 350°F.\n2. Brown the meat in a large skillet over high heat, then drain off any excess fat if necessary. Add the sauce and seasonings, and simmer over low heat for several minutes.\n3. If using frozen spinach, put the spinach in a colander and squeeze and push to get all the liquid out.\n4. Put the cream cheese, cottage cheese, and eggs in a food processor and process until smooth.\n5. Layer half the meat sauce in the bottom of a 9 x 13-inch baking dish. Top with half the grated mozzarella, then layer on half the spinach. Follow with half the cheese mixture, then layer on half the spinach. Repeat the layers, ending with the mozzarella. Top with a good sprinkling of Parmesan cheese. Bake for 40 minutes or until bubbly.",
+    "baseServings": 6,
+    "ingredients": [
+      {"name": "ground meat", "quantity": 2, "unit": "LBS", "prepNote": "thawed; beef and venison work well"},
+      {"name": "spaghetti sauce", "quantity": 2, "unit": "WHOLE", "prepNote": "12-ounce jars; no-sugar-added pizza or spaghetti sauce (see Note)"},
+      {"name": "dried oregano", "quantity": 1.5, "unit": "TBSP", "prepNote": null},
+      {"name": "Mineral Salt", "quantity": 0.5, "unit": "TSP", "prepNote": null},
+      {"name": "onion powder", "quantity": 1, "unit": "TSP", "prepNote": null},
+      {"name": "garlic powder", "quantity": 1, "unit": "TSP", "prepNote": null},
+      {"name": "cayenne pepper", "quantity": 0.125, "unit": "TSP", "prepNote": null},
+      {"name": "Pure Stevia Extract", "quantity": 1, "unit": "PINCH", "prepNote": "optional"},
+      {"name": "frozen chopped spinach", "quantity": 20, "unit": "OZ", "prepNote": "thawed; or use 8-16 ounces roughly chopped fresh spinach, depending on how much you prefer"},
+      {"name": "less fat cream cheese", "quantity": 8, "unit": "OZ", "prepNote": "8-ounce package; 1/3 less fat"},
+      {"name": "cottage cheese", "quantity": 14, "unit": "OZ", "prepNote": "1% cottage cheese"},
+      {"name": "large eggs", "quantity": 2, "unit": "WHOLE", "prepNote": null},
+      {"name": "part-skim mozzarella cheese", "quantity": 8, "unit": "OZ", "prepNote": "grated"},
+      {"name": "Parmesan cheese", "quantity": 0.25, "unit": "CUP", "prepNote": "finely grated; for sprinkling over top; green can kind is fine"}
+    ]
+  },
+  "corrections": [
+    {
+      "field": "ingredients[6].quantity",
+      "modelValue": 0.5,
+      "correctValue": 0.125,
+      "reason": "Model cannot read fractions smaller than 1/2. Card says '⅛ teaspoon cayenne pepper' — model defaulted to 0.5"
+    },
+    {
+      "field": "ingredients[9].quantity",
+      "modelValue": 1,
+      "correctValue": 8,
+      "reason": "Pattern: 'X (Y-ounce) package' — the parenthetical weight IS the quantity in OZ, not '1 package'"
+    },
+    {
+      "field": "ingredients[9].unit",
+      "modelValue": "WHOLE",
+      "correctValue": "OZ",
+      "reason": "Should use OZ with the weight from parenthetical, not WHOLE for the package count"
+    },
+    {
+      "field": "ingredients[10].quantity",
+      "modelValue": 1,
+      "correctValue": 14,
+      "reason": "Pattern: '1 (14-ounce) container' — the parenthetical weight IS the quantity in OZ"
+    },
+    {
+      "field": "ingredients[10].unit",
+      "modelValue": "WHOLE",
+      "correctValue": "OZ",
+      "reason": "Should use OZ with the weight from parenthetical, not WHOLE for the container count"
+    },
+    {
+      "field": "ingredients[13].quantity",
+      "modelValue": 0.5,
+      "correctValue": 0.25,
+      "reason": "Card says '¼ cup finely grated Parmesan cheese' — model read ¼ as ½"
+    }
+  ],
+  "patternLessons": [
+    "PARENTHETICAL_WEIGHT: When recipe says 'X (Y-ounce) package/container/can', extract as quantity=Y, unit=OZ. The parenthetical weight is the actual measurement.",
+    "SMALL_FRACTIONS: Must correctly read ⅛, ¼, ⅓ — do not default to 0.5 when fraction is unrecognized.",
+    "FRACTION_SYMBOLS: Unicode fraction characters (⅛ ¼ ⅓ ½ ⅔ ¾) map to: 0.125, 0.25, 0.333, 0.5, 0.667, 0.75"
+  ]
+}
